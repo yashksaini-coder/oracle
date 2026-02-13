@@ -433,6 +433,7 @@ impl App {
     pub fn next_tab(&mut self) {
         self.current_tab = self.current_tab.next();
         self.list_state.select(Some(0));
+        self.show_completion = false; // Hide completions when switching tabs
         self.filter_items();
         
         // Scan crates if switching to installed crates tab
@@ -444,6 +445,7 @@ impl App {
     pub fn prev_tab(&mut self) {
         self.current_tab = self.current_tab.prev();
         self.list_state.select(Some(0));
+        self.show_completion = false; // Hide completions when switching tabs
         self.filter_items();
         
         // Scan crates if switching to installed crates tab
@@ -487,13 +489,15 @@ impl App {
     pub fn on_char(&mut self, c: char) {
         self.search_input.push(c);
         self.filter_items();
-        self.show_completion = self.search_input.len() >= 2;
+        // Don't show completions in Crates tab - use direct qualified path search
+        self.show_completion = self.search_input.len() >= 2 && self.current_tab != Tab::InstalledCrates;
     }
 
     pub fn on_backspace(&mut self) {
         self.search_input.pop();
         self.filter_items();
-        self.show_completion = self.search_input.len() >= 2;
+        // Don't show completions in Crates tab
+        self.show_completion = self.search_input.len() >= 2 && self.current_tab != Tab::InstalledCrates;
     }
 
     pub fn clear_search(&mut self) {
