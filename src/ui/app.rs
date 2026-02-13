@@ -254,32 +254,81 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_header(&self, area: Rect, buf: &mut Buffer) {
+        // ASCII art banner - compact version
+        let banner = vec![
+            "╔═══╗        ╔╗    ",
+            "║╔═╗║        ║║    ",
+            "║║ ║║╔═╗╔══╗╔══╗║║╔══╗",
+            "║║ ║║║╔╝╚ ╗║║╔═╝║║║╔╗║",
+            "║╚═╝║║║ ║╚╝╚╗║╚═╗║╚╗║╚╝║",
+            "╚═══╝╚╝ ╚═══╝╚══╝╚═╝╚══╝",
+        ];
+        
         let crate_name = self.crate_info
             .map(|c| c.name.as_str())
-            .unwrap_or("Unknown");
+            .unwrap_or("oracle");
         
         let version = self.crate_info
-            .map(|c| format!(" v{}", c.version))
-            .unwrap_or_default();
+            .map(|c| format!("v{}", c.version))
+            .unwrap_or_else(|| "v0.1.0".to_string());
 
-        let title = Line::from(vec![
-            Span::styled("🔮 ", Style::default()),
-            Span::styled(
-                "Oracle",
-                self.theme.style_accent_bold(),
-            ),
-            Span::styled(" │ ", self.theme.style_muted()),
-            Span::styled(crate_name, self.theme.style_normal()),
-            Span::styled(version, self.theme.style_dim()),
-        ]);
+        // For smaller terminals, use compact header
+        if area.height < 4 {
+            let title = Line::from(vec![
+                Span::styled("🔮 ", Style::default()),
+                Span::styled("Oracle", self.theme.style_accent_bold()),
+                Span::styled(" │ ", self.theme.style_muted()),
+                Span::styled(crate_name, self.theme.style_normal()),
+                Span::styled(format!(" {}", version), self.theme.style_dim()),
+            ]);
+            let header = Paragraph::new(title).block(
+                Block::default()
+                    .borders(Borders::BOTTOM)
+                    .border_style(self.theme.style_border()),
+            );
+            header.render(area, buf);
+            return;
+        }
 
-        let header = Paragraph::new(title).block(
-            Block::default()
-                .borders(Borders::BOTTOM)
-                .border_style(self.theme.style_border()),
-        );
+        // Render banner art on left, info on right
+        let chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([
+                Constraint::Length(22),
+                Constraint::Min(20),
+            ])
+            .split(area);
 
-        header.render(area, buf);
+        // Banner
+        let banner_lines: Vec<Line> = banner.iter()
+            .map(|line| Line::from(Span::styled(*line, self.theme.style_accent())))
+            .collect();
+        
+        let banner_widget = Paragraph::new(banner_lines);
+        banner_widget.render(chunks[0], buf);
+
+        // Info panel
+        let info_lines = vec![
+            Line::from(vec![
+                Span::styled("Rust Code Inspector", self.theme.style_accent_bold()),
+            ]),
+            Line::from(vec![
+                Span::styled("Project: ", self.theme.style_dim()),
+                Span::styled(crate_name, self.theme.style_normal()),
+                Span::styled(format!(" ({})", version), self.theme.style_muted()),
+            ]),
+            Line::from(vec![
+                Span::styled("Press ", self.theme.style_dim()),
+                Span::styled("?", self.theme.style_accent()),
+                Span::styled(" for help │ ", self.theme.style_dim()),
+                Span::styled("q", self.theme.style_accent()),
+                Span::styled(" to quit", self.theme.style_dim()),
+            ]),
+        ];
+        
+        let info_widget = Paragraph::new(info_lines)
+            .block(Block::default().borders(Borders::NONE));
+        info_widget.render(chunks[1], buf);
     }
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
@@ -333,10 +382,30 @@ impl<'a> OracleUi<'a> {
             .map(|a| a.selection_highlight)
             .unwrap_or(1.0);
         
+        // Calculate visible area (account for borders)
+        let visible_height = area.height.saturating_sub(2) as usize;
+        let total_items = self.filtered_items.len();
+        
+        // Calculate scroll offset to keep selection visible
+        let scroll_offset = if let Some(sel) = selected {
+            if visible_height == 0 {
+                0
+            } else if sel >= visible_height {
+                // Keep selection near bottom with some context
+                sel.saturating_sub(visible_height - 1)
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+        
         let items: Vec<ListItem> = self
             .filtered_items
             .iter()
             .enumerate()
+            .skip(scroll_offset)
+            .take(visible_height)
             .map(|(idx, item)| {
                 let kind_style = match item.kind() {
                     "fn" => self.theme.style_function(),
@@ -395,19 +464,29 @@ impl<'a> OracleUi<'a> {
             self.theme.style_border()
         };
 
-        // Show item count and filter info
-        let title = if self.search_input.is_empty() {
-            format!(" Items ({}) ", self.filtered_items.len())
+        // Show item count, filter info, and scroll position
+        let scroll_indicator = if total_items > visible_height {
+            let pos = selected.unwrap_or(0) + 1;
+            format!(" [{}/{}]", pos, total_items)
         } else {
-            format!(" Items ({}/{}) ", self.filtered_items.len(), self.items.len())
+            String::new()
+        };
+        
+        let title = if self.search_input.is_empty() {
+            format!(" Items ({}){} ", self.filtered_items.len(), scroll_indicator)
+        } else {
+            format!(" Items ({}/{}){} ", self.filtered_items.len(), self.items.len(), scroll_indicator)
         };
 
-        let list = List::new(items).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(border_style)
-                .title(title),
-        );
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(border_style)
+                    .title(title),
+            )
+            .highlight_style(self.theme.style_selected())
+            .highlight_symbol("▸ ");
 
         Widget::render(list, area, buf);
     }
@@ -421,13 +500,32 @@ impl<'a> OracleUi<'a> {
         } else {
             self.theme.style_border()
         };
+        
+        // Calculate visible area (account for borders)
+        let visible_height = area.height.saturating_sub(2) as usize;
 
         if let Some(crate_info) = self.selected_installed_crate {
+            // Calculate scroll offset for crate items
+            let total_items = self.installed_crate_items.len();
+            let scroll_offset = if let Some(sel) = selected {
+                if visible_height == 0 {
+                    0
+                } else if sel >= visible_height {
+                    sel.saturating_sub(visible_height - 1)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            
             // Show items within selected crate
             let items: Vec<ListItem> = self
                 .installed_crate_items
                 .iter()
                 .enumerate()
+                .skip(scroll_offset)
+                .take(visible_height)
                 .map(|(idx, item)| {
                     let kind_style = match item.kind() {
                         "fn" => self.theme.style_function(),
@@ -478,25 +576,55 @@ impl<'a> OracleUi<'a> {
                 })
                 .collect();
 
-            let title = format!(" 📦 {} v{} ({} items) [Esc to go back] ", 
-                crate_info.name, crate_info.version, self.installed_crate_items.len());
+            // Scroll indicator
+            let scroll_info = if total_items > visible_height {
+                format!(" [{}/{}]", selected.unwrap_or(0) + 1, total_items)
+            } else {
+                String::new()
+            };
+            
+            let title = format!(" 📦 {} v{} ({} items){} [Esc] ", 
+                crate_info.name, crate_info.version, total_items, scroll_info);
 
-            let list = List::new(items).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(border_style)
-                    .title(title),
-            );
+            let list = List::new(items)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(border_style)
+                        .title(title),
+                )
+                .highlight_style(self.theme.style_selected());
 
             Widget::render(list, area, buf);
         } else {
-            // Show list of installed crates
+            // Show list of installed crates with scrolling
             let query = self.search_input.to_lowercase();
-            let items: Vec<ListItem> = self
+            let filtered_crates: Vec<(usize, &String)> = self
                 .installed_crates
                 .iter()
                 .enumerate()
                 .filter(|(_, name)| query.is_empty() || name.to_lowercase().contains(&query))
+                .collect();
+            
+            let total_crates = filtered_crates.len();
+            
+            // Calculate scroll offset
+            let scroll_offset = if let Some(sel) = selected {
+                if visible_height == 0 {
+                    0
+                } else if sel >= visible_height {
+                    sel.saturating_sub(visible_height - 1)
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+            
+            let items: Vec<ListItem> = filtered_crates
+                .into_iter()
+                .skip(scroll_offset)
+                .take(visible_height)
                 .map(|(idx, name)| {
                     let is_selected = Some(idx) == selected;
                     let base_style = if is_selected {
@@ -516,19 +644,27 @@ impl<'a> OracleUi<'a> {
                 })
                 .collect();
 
-            let filtered_count = items.len();
-            let title = if query.is_empty() {
-                format!(" Installed Crates ({}) ", self.installed_crates.len())
+            // Scroll indicator
+            let scroll_info = if total_crates > visible_height {
+                format!(" [{}/{}]", selected.unwrap_or(0) + 1, total_crates)
             } else {
-                format!(" Installed Crates ({}/{}) ", filtered_count, self.installed_crates.len())
+                String::new()
+            };
+            
+            let title = if query.is_empty() {
+                format!(" Installed Crates ({}){} ", self.installed_crates.len(), scroll_info)
+            } else {
+                format!(" Installed Crates ({}/{}){} ", total_crates, self.installed_crates.len(), scroll_info)
             };
 
-            let list = List::new(items).block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .border_style(border_style)
-                    .title(title),
-            );
+            let list = List::new(items)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(border_style)
+                        .title(title),
+                )
+                .highlight_style(self.theme.style_selected());
 
             Widget::render(list, area, buf);
         }
@@ -700,38 +836,79 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_status(&self, area: Rect, buf: &mut Buffer) {
-        // Show current focus and mode
+        // Count items by type for metrics
+        let (fn_count, struct_count, enum_count, trait_count, mod_count) = self.items.iter().fold(
+            (0usize, 0usize, 0usize, 0usize, 0usize),
+            |(f, s, e, t, m), item| match item.kind() {
+                "fn" => (f + 1, s, e, t, m),
+                "struct" => (f, s + 1, e, t, m),
+                "enum" => (f, s, e + 1, t, m),
+                "trait" => (f, s, e, t + 1, m),
+                "mod" => (f, s, e, t, m + 1),
+                _ => (f, s, e, t, m),
+            },
+        );
+        
+        let pub_count = self.items.iter()
+            .filter(|i| matches!(i.visibility(), Some(crate::analyzer::Visibility::Public)))
+            .count();
+
+        // Focus indicator
         let focus_indicator = match self.focus {
-            Focus::Search => "🔍",
-            Focus::List => "📋",
-            Focus::Inspector => "🔬",
+            Focus::Search => ("🔍", "Search"),
+            Focus::List => ("📋", "List"),
+            Focus::Inspector => ("🔬", "Inspector"),
         };
 
-        let shortcuts = vec![
-            Span::styled(format!(" {} ", focus_indicator), self.theme.style_accent()),
-            Span::styled("q", self.theme.style_accent()),
-            Span::raw(":Quit "),
-            Span::styled("Tab", self.theme.style_accent()),
-            Span::raw(":Switch "),
-            Span::styled("↑↓", self.theme.style_accent()),
-            Span::raw(":Navigate "),
-            Span::styled("/", self.theme.style_accent()),
-            Span::raw(":Search "),
-            Span::styled("?", self.theme.style_accent()),
-            Span::raw(":Help"),
+        // Build left side: metrics
+        let metrics = vec![
+            Span::styled(" 📊 ", self.theme.style_accent()),
+            Span::styled("fn:", self.theme.style_function()),
+            Span::styled(format!("{} ", fn_count), self.theme.style_normal()),
+            Span::styled("struct:", self.theme.style_type()),
+            Span::styled(format!("{} ", struct_count), self.theme.style_normal()),
+            Span::styled("enum:", self.theme.style_type()),
+            Span::styled(format!("{} ", enum_count), self.theme.style_normal()),
+            Span::styled("trait:", self.theme.style_keyword()),
+            Span::styled(format!("{} ", trait_count), self.theme.style_normal()),
+            Span::styled("mod:", self.theme.style_accent()),
+            Span::styled(format!("{} ", mod_count), self.theme.style_normal()),
+            Span::styled("│ ", self.theme.style_muted()),
+            Span::styled("pub:", self.theme.style_string()),
+            Span::styled(format!("{}", pub_count), self.theme.style_normal()),
         ];
 
-        let status = if self.status_message.is_empty() {
-            Line::from(shortcuts)
+        // Build right side: focus + selection info
+        let selection_info = if let Some(selected) = self.list_selected {
+            format!(" {}/{}", selected + 1, self.filtered_items.len())
+        } else {
+            format!(" -/{}", self.filtered_items.len())
+        };
+
+        let right_side = vec![
+            Span::styled("│ ", self.theme.style_muted()),
+            Span::styled(focus_indicator.0, self.theme.style_accent()),
+            Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
+            Span::styled(selection_info, self.theme.style_muted()),
+            Span::raw(" "),
+        ];
+
+        // Combine with status message if present
+        let status_line = if self.status_message.is_empty() {
+            let mut line = metrics;
+            line.extend(right_side);
+            Line::from(line)
         } else {
             Line::from(vec![
-                Span::styled(self.status_message.to_string(), self.theme.style_dim()),
-                Span::raw(" │ "),
-                Span::styled(format!("{} ", focus_indicator), self.theme.style_accent()),
+                Span::styled(format!(" {} ", self.status_message), self.theme.style_string()),
+                Span::styled("│ ", self.theme.style_muted()),
+                Span::styled(focus_indicator.0, self.theme.style_accent()),
+                Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
             ])
         };
 
-        let paragraph = Paragraph::new(status).style(Style::default().bg(self.theme.bg_panel));
+        let paragraph = Paragraph::new(status_line)
+            .style(Style::default().bg(self.theme.bg_panel));
         paragraph.render(area, buf);
     }
 
@@ -831,15 +1008,18 @@ impl<'a> OracleUi<'a> {
 
 impl Widget for OracleUi<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
+        // Determine header height based on terminal size
+        let header_height = if area.height >= 30 { 6 } else { 2 };
+        
         // Main layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(2),  // Header
+                Constraint::Length(header_height),  // Header (dynamic)
                 Constraint::Length(2),  // Tabs
                 Constraint::Length(3),  // Search
                 Constraint::Min(10),    // Content
-                Constraint::Length(1),  // Status
+                Constraint::Length(1),  // Status/Footer
             ])
             .split(area);
 
