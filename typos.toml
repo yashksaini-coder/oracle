@@ -1,0 +1,12 @@
+# typos configuration
+# See https://github.com/crate-ci/typos
+
+[default.extend-words]
+# Add any project-specific words that should not be flagged as typos
+
+[files]
+extend-exclude = [
+    "target/",
+    "Cargo.lock",
+    "*.svg",
+]
