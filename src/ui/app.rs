@@ -254,14 +254,14 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_header(&self, area: Rect, buf: &mut Buffer) {
-        // ASCII art banner - compact version
+        // Clean ASCII art banner
         let banner = vec![
-            "╔═══╗        ╔╗    ",
-            "║╔═╗║        ║║    ",
-            "║║ ║║╔═╗╔══╗╔══╗║║╔══╗",
-            "║║ ║║║╔╝╚ ╗║║╔═╝║║║╔╗║",
-            "║╚═╝║║║ ║╚╝╚╗║╚═╗║╚╗║╚╝║",
-            "╚═══╝╚╝ ╚═══╝╚══╝╚═╝╚══╝",
+            " ██████╗ ██████╗  █████╗  ██████╗██╗     ███████╗",
+            "██╔═══██╗██╔══██╗██╔══██╗██╔════╝██║     ██╔════╝",
+            "██║   ██║██████╔╝███████║██║     ██║     █████╗  ",
+            "██║   ██║██╔══██╗██╔══██║██║     ██║     ██╔══╝  ",
+            "╚██████╔╝██║  ██║██║  ██║╚██████╗███████╗███████╗",
+            " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝",
         ];
         
         let crate_name = self.crate_info
@@ -273,13 +273,14 @@ impl<'a> OracleUi<'a> {
             .unwrap_or_else(|| "v0.1.0".to_string());
 
         // For smaller terminals, use compact header
-        if area.height < 4 {
+        if area.height < 5 {
             let title = Line::from(vec![
                 Span::styled("🔮 ", Style::default()),
                 Span::styled("Oracle", self.theme.style_accent_bold()),
                 Span::styled(" │ ", self.theme.style_muted()),
                 Span::styled(crate_name, self.theme.style_normal()),
                 Span::styled(format!(" {}", version), self.theme.style_dim()),
+                Span::styled(" │ Rust Code Inspector", self.theme.style_muted()),
             ]);
             let header = Paragraph::new(title).block(
                 Block::default()
@@ -294,12 +295,12 @@ impl<'a> OracleUi<'a> {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(22),
+                Constraint::Length(52),
                 Constraint::Min(20),
             ])
             .split(area);
 
-        // Banner
+        // Banner with gradient effect
         let banner_lines: Vec<Line> = banner.iter()
             .map(|line| Line::from(Span::styled(*line, self.theme.style_accent())))
             .collect();
@@ -307,27 +308,29 @@ impl<'a> OracleUi<'a> {
         let banner_widget = Paragraph::new(banner_lines);
         banner_widget.render(chunks[0], buf);
 
-        // Info panel
+        // Info panel on right
         let info_lines = vec![
+            Line::from(""),
             Line::from(vec![
-                Span::styled("Rust Code Inspector", self.theme.style_accent_bold()),
+                Span::styled(" Rust Code Inspector", self.theme.style_accent_bold()),
             ]),
             Line::from(vec![
-                Span::styled("Project: ", self.theme.style_dim()),
+                Span::styled(" Project: ", self.theme.style_dim()),
                 Span::styled(crate_name, self.theme.style_normal()),
                 Span::styled(format!(" ({})", version), self.theme.style_muted()),
             ]),
             Line::from(vec![
-                Span::styled("Press ", self.theme.style_dim()),
+                Span::styled(" Press ", self.theme.style_dim()),
                 Span::styled("?", self.theme.style_accent()),
-                Span::styled(" for help │ ", self.theme.style_dim()),
+                Span::styled(" help │ ", self.theme.style_dim()),
                 Span::styled("q", self.theme.style_accent()),
-                Span::styled(" to quit", self.theme.style_dim()),
+                Span::styled(" quit │ ", self.theme.style_dim()),
+                Span::styled("Tab", self.theme.style_accent()),
+                Span::styled(" switch", self.theme.style_dim()),
             ]),
         ];
         
-        let info_widget = Paragraph::new(info_lines)
-            .block(Block::default().borders(Borders::NONE));
+        let info_widget = Paragraph::new(info_lines);
         info_widget.render(chunks[1], buf);
     }
 
@@ -439,13 +442,9 @@ impl<'a> OracleUi<'a> {
                     })
                     .unwrap_or("○");
 
-                // Show qualified name if module path exists
-                let display_name = if !item.module_path().is_empty() {
-                    let path = item.module_path();
-                    format!("{}::{}", path.join("::"), item.name())
-                } else {
-                    item.name().to_string()
-                };
+                // Show short name for local project (no module prefix needed)
+                // For crates tab, module path will be shown
+                let display_name = item.name().to_string();
 
                 ListItem::new(Line::from(vec![
                     Span::styled(prefix, self.theme.style_accent()),
@@ -836,23 +835,6 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_status(&self, area: Rect, buf: &mut Buffer) {
-        // Count items by type for metrics
-        let (fn_count, struct_count, enum_count, trait_count, mod_count) = self.items.iter().fold(
-            (0usize, 0usize, 0usize, 0usize, 0usize),
-            |(f, s, e, t, m), item| match item.kind() {
-                "fn" => (f + 1, s, e, t, m),
-                "struct" => (f, s + 1, e, t, m),
-                "enum" => (f, s, e + 1, t, m),
-                "trait" => (f, s, e, t + 1, m),
-                "mod" => (f, s, e, t, m + 1),
-                _ => (f, s, e, t, m),
-            },
-        );
-        
-        let pub_count = self.items.iter()
-            .filter(|i| matches!(i.visibility(), Some(crate::analyzer::Visibility::Public)))
-            .count();
-
         // Focus indicator
         let focus_indicator = match self.focus {
             Focus::Search => ("🔍", "Search"),
@@ -860,48 +842,75 @@ impl<'a> OracleUi<'a> {
             Focus::Inspector => ("🔬", "Inspector"),
         };
 
-        // Build left side: metrics
-        let metrics = vec![
-            Span::styled(" 📊 ", self.theme.style_accent()),
-            Span::styled("fn:", self.theme.style_function()),
-            Span::styled(format!("{} ", fn_count), self.theme.style_normal()),
-            Span::styled("struct:", self.theme.style_type()),
-            Span::styled(format!("{} ", struct_count), self.theme.style_normal()),
-            Span::styled("enum:", self.theme.style_type()),
-            Span::styled(format!("{} ", enum_count), self.theme.style_normal()),
-            Span::styled("trait:", self.theme.style_keyword()),
-            Span::styled(format!("{} ", trait_count), self.theme.style_normal()),
-            Span::styled("mod:", self.theme.style_accent()),
-            Span::styled(format!("{} ", mod_count), self.theme.style_normal()),
-            Span::styled("│ ", self.theme.style_muted()),
-            Span::styled("pub:", self.theme.style_string()),
-            Span::styled(format!("{}", pub_count), self.theme.style_normal()),
-        ];
-
-        // Build right side: focus + selection info
-        let selection_info = if let Some(selected) = self.list_selected {
-            format!(" {}/{}", selected + 1, self.filtered_items.len())
-        } else {
-            format!(" -/{}", self.filtered_items.len())
-        };
-
-        let right_side = vec![
-            Span::styled("│ ", self.theme.style_muted()),
-            Span::styled(focus_indicator.0, self.theme.style_accent()),
-            Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
-            Span::styled(selection_info, self.theme.style_muted()),
-            Span::raw(" "),
-        ];
-
-        // Combine with status message if present
-        let status_line = if self.status_message.is_empty() {
-            let mut line = metrics;
-            line.extend(right_side);
-            Line::from(line)
-        } else {
+        // Different footer for different contexts
+        let status_line = if self.current_tab == Tab::InstalledCrates {
+            // Crates tab footer
+            if let Some(crate_info) = self.selected_installed_crate {
+                let selection_info = if let Some(selected) = self.list_selected {
+                    format!("[{}/{}]", selected + 1, self.installed_crate_items.len())
+                } else {
+                    format!("[0/{}]", self.installed_crate_items.len())
+                };
+                Line::from(vec![
+                    Span::styled(" 📦 ", self.theme.style_accent()),
+                    Span::styled(&crate_info.name, self.theme.style_normal()),
+                    Span::styled(format!(" v{}", crate_info.version), self.theme.style_dim()),
+                    Span::styled(" │ ", self.theme.style_muted()),
+                    Span::styled(selection_info, self.theme.style_muted()),
+                    Span::styled(" │ ", self.theme.style_muted()),
+                    Span::styled(focus_indicator.0, self.theme.style_accent()),
+                    Span::styled(format!(" {} ", focus_indicator.1), self.theme.style_dim()),
+                    Span::styled("│ Esc: back", self.theme.style_muted()),
+                ])
+            } else {
+                Line::from(vec![
+                    Span::styled(" 📦 Installed Crates ", self.theme.style_accent()),
+                    Span::styled(format!("({}) ", self.installed_crates.len()), self.theme.style_normal()),
+                    Span::styled("│ ", self.theme.style_muted()),
+                    Span::styled(focus_indicator.0, self.theme.style_accent()),
+                    Span::styled(format!(" {} ", focus_indicator.1), self.theme.style_dim()),
+                    Span::styled("│ Enter: select │ Type: search", self.theme.style_muted()),
+                ])
+            }
+        } else if !self.status_message.is_empty() {
+            // Custom status message
             Line::from(vec![
                 Span::styled(format!(" {} ", self.status_message), self.theme.style_string()),
                 Span::styled("│ ", self.theme.style_muted()),
+                Span::styled(focus_indicator.0, self.theme.style_accent()),
+                Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
+            ])
+        } else {
+            // Normal footer with counts
+            let (fn_count, struct_count, enum_count, trait_count) = self.items.iter().fold(
+                (0usize, 0usize, 0usize, 0usize),
+                |(f, s, e, t), item| match item.kind() {
+                    "fn" => (f + 1, s, e, t),
+                    "struct" => (f, s + 1, e, t),
+                    "enum" => (f, s, e + 1, t),
+                    "trait" => (f, s, e, t + 1),
+                    _ => (f, s, e, t),
+                },
+            );
+            
+            let selection_info = if let Some(selected) = self.list_selected {
+                format!("[{}/{}]", selected + 1, self.filtered_items.len())
+            } else {
+                format!("[0/{}]", self.filtered_items.len())
+            };
+
+            Line::from(vec![
+                Span::styled(" fn:", self.theme.style_function()),
+                Span::styled(format!("{}", fn_count), self.theme.style_normal()),
+                Span::styled(" struct:", self.theme.style_type()),
+                Span::styled(format!("{}", struct_count), self.theme.style_normal()),
+                Span::styled(" enum:", self.theme.style_type()),
+                Span::styled(format!("{}", enum_count), self.theme.style_normal()),
+                Span::styled(" trait:", self.theme.style_keyword()),
+                Span::styled(format!("{}", trait_count), self.theme.style_normal()),
+                Span::styled(" │ ", self.theme.style_muted()),
+                Span::styled(selection_info, self.theme.style_muted()),
+                Span::styled(" │ ", self.theme.style_muted()),
                 Span::styled(focus_indicator.0, self.theme.style_accent()),
                 Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
             ])

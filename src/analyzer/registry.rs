@@ -328,29 +328,29 @@ impl CrateRegistry {
     }
 
     /// Build full module path from file path and crate name
+    /// Only includes crate_name and submodules, not registry paths
     fn build_module_path(file_path: &Path, crate_name: &str) -> Vec<String> {
         let mut path = vec![crate_name.to_string()];
         
-        // Get path components after 'src/'
-        let mut in_src = false;
-        for component in file_path.iter() {
-            let name = component.to_string_lossy();
-            if in_src {
-                // Add directory components as module path
-                let name = name.to_string();
+        // Find 'src' directory and take everything after it
+        let components: Vec<_> = file_path.iter().collect();
+        let src_pos = components.iter().position(|c| c.to_string_lossy() == "src");
+        
+        if let Some(pos) = src_pos {
+            // Take components after 'src/'
+            for component in components.iter().skip(pos + 1) {
+                let name = component.to_string_lossy().to_string();
                 if name.ends_with(".rs") {
                     // Remove .rs extension
                     let module = name.trim_end_matches(".rs");
-                    // Skip lib.rs and main.rs and mod.rs as they represent the parent module
+                    // Skip lib.rs, main.rs, mod.rs as they represent parent module
                     if module != "lib" && module != "main" && module != "mod" {
                         path.push(module.to_string());
                     }
                 } else {
+                    // Directory = submodule
                     path.push(name);
                 }
-            }
-            if name == "src" {
-                in_src = true;
             }
         }
         
