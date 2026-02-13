@@ -239,16 +239,30 @@ impl App {
     }
 
     /// Filter installed crates based on search
+    /// Supports qualified path search like "serde::de::Deserialize"
     fn filter_installed_crates(&mut self) {
         let query = self.search_input.to_lowercase();
         
         if self.selected_installed_crate.is_some() {
-            // Filter items within selected crate
+            // Filter items within selected crate by qualified path or name
             self.installed_crate_filtered = self.installed_crate_items
                 .iter()
                 .enumerate()
                 .filter(|(_, item)| {
-                    query.is_empty() || item.name().to_lowercase().contains(&query)
+                    if query.is_empty() {
+                        return true;
+                    }
+                    // Check if query contains :: for path matching
+                    if query.contains("::") {
+                        // Match against qualified path
+                        item.qualified_name().to_lowercase().contains(&query) ||
+                        // Or match partial module path
+                        item.module_path().iter()
+                            .any(|p| p.to_lowercase().contains(&query.replace("::", "")))
+                    } else {
+                        // Simple name match
+                        item.name().to_lowercase().contains(&query)
+                    }
                 })
                 .map(|(i, _)| i)
                 .collect();
@@ -258,6 +272,62 @@ impl App {
         if self.list_state.selected().is_some_and(|s| s >= self.get_current_list_len()) {
             self.list_state.select(Some(0));
         }
+    }
+
+    /// Parse qualified path and navigate to crate + filter items
+    /// E.g., "serde::de::Deserialize" -> select serde crate, filter for de::Deserialize
+    pub fn search_qualified_path(&mut self) -> bool {
+        let query = self.search_input.clone();
+        let query = query.trim();
+        
+        // Check for qualified path (contains ::)
+        if !query.contains("::") {
+            return false;
+        }
+        
+        let parts: Vec<&str> = query.split("::").collect();
+        if parts.is_empty() {
+            return false;
+        }
+        
+        let crate_name = parts[0].to_string();
+        
+        // Check if crate exists
+        let crate_exists = self.installed_crates_list.iter()
+            .any(|name| name.to_lowercase() == crate_name.to_lowercase() ||
+                        name.to_lowercase().replace('-', "_") == crate_name.to_lowercase());
+        
+        if !crate_exists {
+            self.status_message = format!("Crate '{}' not found", crate_name);
+            return false;
+        }
+        
+        // Find actual crate name (might have hyphens)
+        let actual_name = self.installed_crates_list.iter()
+            .find(|name| name.to_lowercase() == crate_name.to_lowercase() ||
+                         name.to_lowercase().replace('-', "_") == crate_name.to_lowercase())
+            .cloned();
+        
+        // Select the crate if not already selected
+        let already_selected = self.selected_installed_crate
+            .as_ref()
+            .map(|c| c.name.to_lowercase() == crate_name.to_lowercase())
+            .unwrap_or(false);
+        
+        if !already_selected {
+            if let Some(name) = actual_name {
+                let _ = self.select_installed_crate(&name);
+            }
+        }
+        
+        // Set search to remaining path for filtering
+        if parts.len() > 1 {
+            // Keep the module path part for filtering
+            self.search_input = parts[1..].join("::");
+            self.filter_installed_crates();
+        }
+        
+        true
     }
 
     /// Select an installed crate and analyze it

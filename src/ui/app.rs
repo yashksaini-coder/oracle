@@ -341,9 +341,20 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_search(&self, area: Rect, buf: &mut Buffer) {
+        // Different placeholder based on tab context
+        let placeholder = if self.current_tab == Tab::InstalledCrates {
+            if self.selected_installed_crate.is_some() {
+                "Filter items... (e.g., de::Deserialize)"
+            } else {
+                "Search crates... (e.g., serde::de::Value)"
+            }
+        } else {
+            "Type to search... (fuzzy matching)"
+        };
+        
         let search = SearchBar::new(self.search_input, self.theme)
             .focused(self.focus == Focus::Search)
-            .placeholder("Type to search... (fuzzy matching)");
+            .placeholder(placeholder);
 
         search.render(area, buf);
     }
@@ -551,16 +562,18 @@ impl<'a> OracleUi<'a> {
                         })
                         .unwrap_or("○");
 
-                    // Show qualified name with module path
-                    let display_name = if item.module_path().len() > 1 {
-                        // Skip crate name for brevity, show submodule::name
-                        let subpath = &item.module_path()[1..];
-                        if subpath.is_empty() {
-                            item.name().to_string()
-                        } else {
-                            format!("{}::{}", subpath.join("::"), item.name())
-                        }
+                    // Show item name with short module hint
+                    // module_path is like ["crate_name", "submod", "subsubmod"]
+                    let module_path = item.module_path();
+                    let display_name = if module_path.len() > 2 {
+                        // Has submodules - show last submodule as hint
+                        let last_mod = &module_path[module_path.len() - 1];
+                        format!("{}::{}", last_mod, item.name())
+                    } else if module_path.len() == 2 {
+                        // In a direct submodule
+                        format!("{}::{}", module_path[1], item.name())
                     } else {
+                        // Root level
                         item.name().to_string()
                     };
 

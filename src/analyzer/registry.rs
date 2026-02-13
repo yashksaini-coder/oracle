@@ -327,34 +327,32 @@ impl CrateRegistry {
         Ok(())
     }
 
-    /// Build full module path from file path and crate name
-    /// Only includes crate_name and submodules, not registry paths
+    /// Build module path from file path relative to src/
+    /// Returns clean path like ["serde", "de", "value"] not registry paths
     fn build_module_path(file_path: &Path, crate_name: &str) -> Vec<String> {
-        let mut path = vec![crate_name.to_string()];
+        let mut result = vec![crate_name.to_string()];
         
-        // Find 'src' directory and take everything after it
-        let components: Vec<_> = file_path.iter().collect();
-        let src_pos = components.iter().position(|c| c.to_string_lossy() == "src");
+        // Convert to string and find src/ 
+        let path_str = file_path.to_string_lossy();
         
-        if let Some(pos) = src_pos {
-            // Take components after 'src/'
-            for component in components.iter().skip(pos + 1) {
-                let name = component.to_string_lossy().to_string();
-                if name.ends_with(".rs") {
-                    // Remove .rs extension
-                    let module = name.trim_end_matches(".rs");
-                    // Skip lib.rs, main.rs, mod.rs as they represent parent module
+        // Find the last "src/" in the path
+        if let Some(src_idx) = path_str.rfind("/src/") {
+            let after_src = &path_str[src_idx + 5..]; // Skip "/src/"
+            
+            for part in after_src.split('/') {
+                if part.ends_with(".rs") {
+                    let module = part.trim_end_matches(".rs");
+                    // Skip lib.rs, main.rs, mod.rs
                     if module != "lib" && module != "main" && module != "mod" {
-                        path.push(module.to_string());
+                        result.push(module.to_string());
                     }
-                } else {
-                    // Directory = submodule
-                    path.push(name);
+                } else if !part.is_empty() {
+                    result.push(part.to_string());
                 }
             }
         }
         
-        path
+        result
     }
 
     /// Search for crates by name

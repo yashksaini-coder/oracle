@@ -10,7 +10,7 @@ use crossterm::{
 };
 use oracle_lib::{
     app::App,
-    ui::{app::Focus, AnimationState, OracleUi},
+    ui::{app::Focus, app::Tab, AnimationState, OracleUi},
 };
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{env, io, path::PathBuf, time::Duration};
@@ -264,6 +264,10 @@ fn handle_search_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             if app.show_completion {
                 app.select_completion();
             } else {
+                // For Crates tab, try qualified path search
+                if app.current_tab == Tab::InstalledCrates {
+                    app.search_qualified_path();
+                }
                 app.filter_items();
                 app.focus = Focus::List;
             }
