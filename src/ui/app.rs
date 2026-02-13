@@ -611,11 +611,23 @@ impl<'a> OracleUi<'a> {
         } else {
             // Show list of installed crates with scrolling
             let query = self.search_input.to_lowercase();
+            
+            // For qualified paths, only use the first part (crate name) for filtering
+            let filter_query = if query.contains("::") {
+                query.split("::").next().unwrap_or("").to_string()
+            } else {
+                query.clone()
+            };
+            
             let filtered_crates: Vec<(usize, &String)> = self
                 .installed_crates
                 .iter()
                 .enumerate()
-                .filter(|(_, name)| query.is_empty() || name.to_lowercase().contains(&query))
+                .filter(|(_, name)| {
+                    filter_query.is_empty() || 
+                    name.to_lowercase().contains(&filter_query) ||
+                    name.to_lowercase().replace('-', "_").contains(&filter_query)
+                })
                 .collect();
             
             let total_crates = filtered_crates.len();
@@ -663,10 +675,10 @@ impl<'a> OracleUi<'a> {
                 String::new()
             };
             
-            let title = if query.is_empty() {
+            let title = if filter_query.is_empty() {
                 format!(" Installed Crates ({}){} ", self.installed_crates.len(), scroll_info)
             } else {
-                format!(" Installed Crates ({}/{}){} ", total_crates, self.installed_crates.len(), scroll_info)
+                format!(" Installed Crates ({}/{}) [{}]{} ", total_crates, self.installed_crates.len(), filter_query, scroll_info)
             };
 
             let list = List::new(items)
