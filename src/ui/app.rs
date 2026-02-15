@@ -289,14 +289,12 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_header(&self, area: Rect, buf: &mut Buffer) {
-        // Clean ASCII art banner
+        // Cyberpunk-style ASCII art banner
         let banner = vec![
-            " ██████╗ ██████╗  █████╗  ██████╗██╗     ███████╗",
-            "██╔═══██╗██╔══██╗██╔══██╗██╔════╝██║     ██╔════╝",
-            "██║   ██║██████╔╝███████║██║     ██║     █████╗  ",
-            "██║   ██║██╔══██╗██╔══██║██║     ██║     ██╔══╝  ",
-            "╚██████╔╝██║  ██║██║  ██║╚██████╗███████╗███████╗",
-            " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝",
+            "  ⚡ ORACLE CODE INSPECTOR ⚡",
+            " ╔═══════════════════════════════════════════════════════╗",
+            " ║  Rust Code Analysis & Inspection Terminal Interface  ║",
+            " ╚═══════════════════════════════════════════════════════╝",
         ];
 
         let crate_name = self.crate_info
@@ -308,12 +306,12 @@ impl<'a> OracleUi<'a> {
 
         if area.height < 5 {
             let title = Line::from(vec![
-                Span::styled("🔮 ", Style::default()),
+                Span::styled("⚡ ", self.theme.style_accent()),
                 Span::styled("Oracle", self.theme.style_accent_bold()),
-                Span::styled(" │ ", self.theme.style_muted()),
+                Span::styled(" :: ", self.theme.style_border_focused()),
                 Span::styled(crate_name, self.theme.style_normal()),
                 Span::styled(format!(" {}", version), self.theme.style_dim()),
-                Span::styled(" │ Rust Code Inspector", self.theme.style_muted()),
+                Span::styled(" :: Rust Inspector", self.theme.style_muted()),
             ]);
             let header = Paragraph::new(title).block(
                 Block::default()
@@ -327,35 +325,50 @@ impl<'a> OracleUi<'a> {
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Length(52),
+                Constraint::Length(58),
                 Constraint::Min(20),
             ])
             .split(area);
 
         let banner_lines: Vec<Line> = banner
             .iter()
-            .map(|line| Line::from(Span::styled(*line, self.theme.style_accent())))
+            .enumerate()
+            .map(|(idx, line)| {
+                let style = if idx == 0 || idx == 3 {
+                    self.theme.style_accent_bold()
+                } else {
+                    self.theme.style_border()
+                };
+                Line::from(Span::styled(*line, style))
+            })
             .collect();
         Paragraph::new(banner_lines).render(chunks[0], buf);
 
         let info_lines = vec![
-            Line::from(""),
             Line::from(vec![
-                Span::styled(" Rust Code Inspector", self.theme.style_accent_bold()),
+                Span::styled("┌─ STATUS ", self.theme.style_border_focused()),
+                Span::styled("─", self.theme.style_border()),
             ]),
             Line::from(vec![
-                Span::styled(" Project: ", self.theme.style_dim()),
-                Span::styled(crate_name, self.theme.style_normal()),
+                Span::styled("│ Target: ", self.theme.style_dim()),
+                Span::styled(crate_name, self.theme.style_accent()),
                 Span::styled(format!(" ({})", version), self.theme.style_muted()),
             ]),
             Line::from(vec![
-                Span::styled(" Press ", self.theme.style_dim()),
-                Span::styled("?", self.theme.style_accent()),
-                Span::styled(" help │ ", self.theme.style_dim()),
-                Span::styled("q", self.theme.style_accent()),
-                Span::styled(" quit │ ", self.theme.style_dim()),
-                Span::styled("Tab", self.theme.style_accent()),
-                Span::styled(" switch", self.theme.style_dim()),
+                Span::styled("│ Mode: ", self.theme.style_dim()),
+                Span::styled("ANALYSIS", self.theme.style_accent()),
+            ]),
+            Line::from(vec![
+                Span::styled("└─ COMMANDS ", self.theme.style_border_focused()),
+                Span::styled("─────────────────────────", self.theme.style_border()),
+            ]),
+            Line::from(vec![
+                Span::styled("  [?]", self.theme.style_accent()),
+                Span::styled(" help  ", self.theme.style_dim()),
+                Span::styled("[q]", self.theme.style_accent()),
+                Span::styled(" quit  ", self.theme.style_dim()),
+                Span::styled("[⇆]", self.theme.style_accent()),
+                Span::styled(" switch tabs", self.theme.style_dim()),
             ]),
         ];
         Paragraph::new(info_lines).render(chunks[1], buf);
@@ -476,9 +489,9 @@ impl<'a> OracleUi<'a> {
                     Style::default()
                 };
 
-                let prefix = if is_selected { "▸ " } else { "  " };
+                let prefix = if is_selected { "❱❱ " } else { "  " };
 
-                // Show visibility indicator
+                // Show visibility indicator with cyberpunk styling
                 let vis = item.visibility()
                     .map(|v| match v {
                         crate::analyzer::Visibility::Public => "●",
@@ -493,9 +506,10 @@ impl<'a> OracleUi<'a> {
 
                 ListItem::new(Line::from(vec![
                     Span::styled(prefix, self.theme.style_accent()),
-                    Span::styled(vis, self.theme.style_dim()),
+                    Span::styled(format!("[{}]", vis), self.theme.style_dim()),
                     Span::raw(" "),
-                    Span::styled(format!("{:6} ", item.kind()), kind_style),
+                    Span::styled(format!("{:6}", item.kind()), kind_style),
+                    Span::raw(" "),
                     Span::styled(display_name, self.theme.style_normal()),
                 ]))
                 .style(base_style)
@@ -511,15 +525,15 @@ impl<'a> OracleUi<'a> {
         // Show item count, filter info, and scroll position
         let scroll_indicator = if total_items > visible_height {
             let pos = selected.unwrap_or(0) + 1;
-            format!(" [{}/{}]", pos, total_items)
+            format!(" ◇ {}/{}", pos, total_items)
         } else {
             String::new()
         };
         
         let title = if self.search_input.is_empty() {
-            format!(" Items ({}){} ", self.filtered_items.len(), scroll_indicator)
+            format!(" ◆ RESULTS ({}){}  ", self.filtered_items.len(), scroll_indicator)
         } else {
-            format!(" Items ({}/{}){} ", self.filtered_items.len(), self.items.len(), scroll_indicator)
+            format!(" ◆ FILTERED ({}/{}){}  ", self.filtered_items.len(), self.items.len(), scroll_indicator)
         };
 
         let list_area = Rect {
@@ -534,7 +548,7 @@ impl<'a> OracleUi<'a> {
                     .title(title),
             )
             .highlight_style(self.theme.style_selected())
-            .highlight_symbol("▸ ");
+            .highlight_symbol("❱ ");
 
         Widget::render(list, list_area, buf);
 

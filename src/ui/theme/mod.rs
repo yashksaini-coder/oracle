@@ -9,6 +9,7 @@ pub enum ThemeKind {
     Nord,
     CatppuccinMocha,
     Dracula,
+    Cyberpunk,
 }
 
 impl ThemeKind {
@@ -17,6 +18,7 @@ impl ThemeKind {
         ThemeKind::Nord,
         ThemeKind::CatppuccinMocha,
         ThemeKind::Dracula,
+        ThemeKind::Cyberpunk,
     ];
 
     pub fn name(&self) -> &'static str {
@@ -25,6 +27,7 @@ impl ThemeKind {
             ThemeKind::Nord => "nord",
             ThemeKind::CatppuccinMocha => "catppuccin_mocha",
             ThemeKind::Dracula => "dracula",
+            ThemeKind::Cyberpunk => "cyberpunk",
         }
     }
 
@@ -34,6 +37,7 @@ impl ThemeKind {
             ThemeKind::Nord => "Nord",
             ThemeKind::CatppuccinMocha => "Catppuccin Mocha",
             ThemeKind::Dracula => "Dracula",
+            ThemeKind::Cyberpunk => "Cyberpunk",
         }
     }
 
@@ -44,6 +48,7 @@ impl ThemeKind {
             "nord" => ThemeKind::Nord,
             "catppuccin_mocha" | "catppuccin" | "mocha" | "catppuccin mocha" => ThemeKind::CatppuccinMocha,
             "dracula" => ThemeKind::Dracula,
+            "cyberpunk" | "cyber" | "punk" => ThemeKind::Cyberpunk,
             "default_dark" | "default" | "default dark" => ThemeKind::DefaultDark,
             _ => ThemeKind::DefaultDark,
         }
@@ -190,12 +195,40 @@ impl Theme {
         }
     }
 
+    /// Cyberpunk theme - Neon sci-fi retro futuristic
+    pub fn cyberpunk() -> Self {
+        Self {
+            name: "Cyberpunk".into(),
+            accent: Color::Rgb(0, 255, 136),       // Neon Cyan/Green (#00FF88)
+            accent_dim: Color::Rgb(0, 136, 136),   // Darker Cyan
+            bg: Color::Rgb(10, 10, 20),            // Deep Black
+            bg_highlight: Color::Rgb(30, 30, 50),  // Slightly lighter for selection
+            bg_panel: Color::Rgb(15, 15, 30),      // Panel background
+            fg: Color::Rgb(255, 255, 255),         // Bright White
+            fg_dim: Color::Rgb(100, 220, 200),     // Dim Cyan
+            fg_muted: Color::Rgb(60, 80, 100),     // Muted dark blue
+            border: Color::Rgb(0, 150, 150),       // Cyan borders
+            border_focused: Color::Rgb(255, 0, 136), // Hot Pink focus (#FF0088)
+            error: Color::Rgb(255, 0, 80),         // Bright Red/Pink
+            warning: Color::Rgb(255, 150, 0),      // Electric Orange
+            success: Color::Rgb(0, 255, 136),      // Neon Green
+            info: Color::Rgb(0, 200, 255),         // Electric Blue
+            keyword: Color::Rgb(255, 0, 136),      // Hot Pink
+            function: Color::Rgb(0, 255, 136),     // Neon Cyan
+            type_: Color::Rgb(0, 200, 255),        // Electric Blue
+            string: Color::Rgb(255, 200, 0),       // Neon Yellow/Gold
+            number: Color::Rgb(255, 100, 200),     // Hot Pink
+            comment: Color::Rgb(80, 100, 150),     // Muted Blue-Gray
+        }
+    }
+
     pub fn from_kind(kind: ThemeKind) -> Self {
         match kind {
             ThemeKind::DefaultDark => Self::default_dark(),
             ThemeKind::Nord => Self::nord(),
             ThemeKind::CatppuccinMocha => Self::catppuccin_mocha(),
             ThemeKind::Dracula => Self::dracula(),
+            ThemeKind::Cyberpunk => Self::cyberpunk(),
         }
     }
 

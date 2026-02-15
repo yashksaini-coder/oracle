@@ -105,18 +105,23 @@ impl Widget for SearchBar<'_> {
             self.theme.style_border()
         };
 
+        // Cyberpunk border styling with double lines
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(border_style)
-            .title(" Search ");
+            .title(if self.focused {
+                " ⚡ QUERY ⚡ "
+            } else {
+                " ◇ SEARCH ◇ "
+            });
 
         let inner = block.inner(area);
         block.render(area, buf);
 
-        // Render prompt
+        // Cyberpunk prompt indicator
         let prompt = Span::styled(
-            "❯ ",
-            self.theme.style_accent_bold(),
+            if self.focused { ">> " } else { "◇ " },
+            self.theme.style_border_focused(),
         );
 
         let (input_text, input_style) = if self.input.is_empty() {
@@ -125,8 +130,9 @@ impl Widget for SearchBar<'_> {
             (self.input, self.theme.style_normal())
         };
 
+        // Animated blinking cursor for focused state
         let cursor = if self.focused {
-            Span::styled("▏", Style::default().fg(self.theme.accent).add_modifier(Modifier::SLOW_BLINK))
+            Span::styled("█", Style::default().fg(self.theme.accent).add_modifier(Modifier::SLOW_BLINK))
         } else {
             Span::raw("")
         };

@@ -60,9 +60,10 @@ impl<'a> InspectorPanel<'a> {
 
     fn section_header(&self, title: &str) -> Line<'static> {
         Line::from(vec![
-            Span::styled("▸ ", self.theme.style_accent()),
+            Span::styled("┏━ ", self.theme.style_border_focused()),
             Span::styled(title.to_string(), self.theme.style_accent().add_modifier(Modifier::BOLD)),
-            Span::styled(" ─────────────────", self.theme.style_muted()),
+            Span::styled(" ", self.theme.style_border()),
+            Span::styled("━━━━━━━━━━━━━", self.theme.style_border()),
         ])
     }
 
@@ -85,44 +86,56 @@ impl<'a> InspectorPanel<'a> {
     fn render_empty(&self, area: Rect, buf: &mut Buffer) {
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
             .border_style(self.theme.style_border())
-            .title(" ◇ Inspector ");
+            .title(" ◆ INSPECTOR ◆ ");
 
         let inner = block.inner(area);
         block.render(area, buf);
 
         let help_text = vec![
             Line::from(""),
+            Line::from(vec![
+                Span::styled("  ⟳ ", self.theme.style_border_focused()),
+                Span::styled(
+                    "No item selected",
+                    self.theme.style_muted(),
+                ),
+            ]),
+            Line::from(""),
             Line::from(Span::styled(
-                "  No item selected",
-                self.theme.style_muted(),
+                "  Select an item from the list to view",
+                self.theme.style_dim(),
+            )),
+            Line::from(Span::styled(
+                "  detailed API information.",
+                self.theme.style_dim(),
             )),
             Line::from(""),
-            Line::from("  Select an item from the list to view"),
-            Line::from("  detailed API information."),
-            Line::from(""),
-            Line::from(self.section_header("Navigation")),
+            Line::from(self.section_header("NAVIGATION")),
             Line::from(""),
             Line::from(vec![
                 Span::raw("  "),
-                Span::styled("↑/↓ j/k", self.theme.style_accent()),
-                Span::raw("  Navigate list"),
+                Span::styled("[↑↓]", self.theme.style_accent()),
+                Span::raw(" or "),
+                Span::styled("[j/k]", self.theme.style_accent()),
+                Span::raw("  Navigate"),
             ]),
             Line::from(vec![
                 Span::raw("  "),
-                Span::styled("Enter/→", self.theme.style_accent()),
+                Span::styled("[Enter]", self.theme.style_accent()),
+                Span::raw(" or "),
+                Span::styled("[→]", self.theme.style_accent()),
                 Span::raw("  View details"),
             ]),
             Line::from(vec![
                 Span::raw("  "),
-                Span::styled("/", self.theme.style_accent()),
-                Span::raw("        Search"),
+                Span::styled("[/]", self.theme.style_accent()),
+                Span::raw("              Search items"),
             ]),
             Line::from(vec![
                 Span::raw("  "),
-                Span::styled("1-4", self.theme.style_accent()),
-                Span::raw("      Switch tabs"),
+                Span::styled("[1-4]", self.theme.style_accent()),
+                Span::raw("            Switch tabs"),
             ]),
         ];
 
