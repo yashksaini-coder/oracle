@@ -226,7 +226,7 @@ mod tests {
         }
         let analyzer = DependencyAnalyzer::from_manifest(&manifest).unwrap();
         let root = analyzer.root_package().expect("root package");
-        assert_eq!(root.name, "oracle");
+        assert_eq!(root.name, "oracle-tui");
         let tree = analyzer.dependency_tree(&root.name);
         assert!(!tree.is_empty());
         assert_eq!(tree[0].0, root.name);

@@ -6,7 +6,7 @@
 
 [![CI](https://github.com/yashksaini-coder/oracle/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yashksaini-coder/oracle/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/yashksaini-coder/oracle/blob/main/LICENSE)
-[![Crates.io](https://img.shields.io/crates/v/oracle?label=crates.io)](https://crates.io/crates/oracle)
+[![Crates.io](https://img.shields.io/crates/v/oracle-tui?label=crates.io)](https://crates.io/crates/oracle-tui)
 [![Rust](https://img.shields.io/badge/Rust-1.70+-blue?logo=rust)](https://www.rust-lang.org/)
 
 </div>
@@ -47,8 +47,10 @@ Built with [Ratatui](https://ratatui.rs) for a smooth, responsive TUI experience
 With Rust and Cargo installed:
 
 ```bash
-cargo install oracle
+cargo install oracle-tui
 ```
+
+The binary is still named `oracle`; run it with `oracle`.
 
 ### From source
 
@@ -112,7 +114,7 @@ make release
 
 ## 📤 Releasing (maintainers)
 
-- **Publish to crates.io** (after `cargo login`): `make publish-dry-run` then `make publish`.
+- **Publish to crates.io** (after `cargo login`): `make publish-dry-run` then `make publish`. The crate is published as **oracle-tui** (the name "oracle" is taken by another project on crates.io).
 - **GitHub Release**: Push a version tag (e.g. `v0.1.0`). The [release workflow](.github/workflows/release.yml) builds binaries for Linux, macOS (Intel + Apple Silicon), and Windows and creates a release. Optionally set `CARGO_REGISTRY_TOKEN` in repo secrets to auto-publish to crates.io on tag push.
 
 ## 🤝 Contributing

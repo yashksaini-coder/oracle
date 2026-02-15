@@ -15,12 +15,12 @@ release:
 install:
 	@echo "🧹 Removing old build (target/)..."
 	cargo clean
-	@echo "📥 Installing oracle (from current directory)..."
+	@echo "📥 Installing oracle-tui (binary: oracle)..."
 	cargo install --path .
 
 uninstall:
-	@echo "🗑️  Uninstalling oracle..."
-	cargo uninstall oracle
+	@echo "🗑️  Uninstalling oracle-tui..."
+	cargo uninstall oracle-tui
 
 publish-dry-run:
 	@echo "🔍 Dry-run: would publish to crates.io..."
@@ -215,7 +215,7 @@ help:
 	@echo "  build        Build debug version"
 	@echo "  release      Build optimized release"
 	@echo "  install      Clean target/ then install binary (cargo install --path .)"
-	@echo "  uninstall   Remove oracle from ~/.cargo/bin (cargo uninstall oracle)"
+	@echo "  uninstall   Remove oracle from ~/.cargo/bin (cargo uninstall oracle-tui)"
 	@echo "  publish-dry-run  Check crate for publish (no upload)"
 	@echo "  publish      Publish to crates.io (requires login)"
 	@echo "  run          Run Oracle"

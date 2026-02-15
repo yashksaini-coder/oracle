@@ -1,6 +1,6 @@
 [package]
-name = "oracle"
-version = "0.1.0"
+name = "oracle-tui"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.75"
 description = "Blazing-fast Rust Code Inspector for the Terminal"
@@ -10,7 +10,7 @@ keywords = ["tui", "inspector", "rust", "analyzer", "developer-tools"]
 categories = ["command-line-utilities", "development-tools"]
 repository = "https://github.com/yashksaini-coder/oracle"
 homepage = "https://github.com/yashksaini-coder/oracle"
-documentation = "https://docs.rs/oracle"
+documentation = "https://docs.rs/oracle_tui"
 readme = "README.md"
 
 [package.metadata.cargo-machete]
