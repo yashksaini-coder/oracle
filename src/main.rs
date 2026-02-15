@@ -272,32 +272,59 @@ fn handle_key_event(
 ) {
     use oracle_lib::ui::app::Tab;
 
-    // Global shortcuts
+    // When Copilot chat panel is open, all typing goes to chat first (no command stealing)
+    if app.copilot_chat_open {
+        match code {
+            KeyCode::Char(c) => {
+                if modifiers == KeyModifiers::SHIFT && c == 'C' {
+                    // Let Shift+C fall through to toggle panel
+                } else {
+                    app.focus = Focus::CopilotChat;
+                    app.copilot_chat_input.push(c);
+                    return;
+                }
+            }
+            KeyCode::Backspace => {
+                app.focus = Focus::CopilotChat;
+                app.copilot_chat_input.pop();
+                return;
+            }
+            KeyCode::Enter if modifiers.is_empty() => {
+                app.focus = Focus::CopilotChat;
+                app.submit_copilot_message();
+                return;
+            }
+            _ => {}
+        }
+    }
+
+    // Global shortcuts — never run when focus is CopilotChat
+    let in_copilot_chat = app.focus == Focus::CopilotChat;
     match code {
-        KeyCode::Char('q') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('q') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.should_quit = true;
             return;
         }
-        KeyCode::Char('?') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('?') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.toggle_help();
             return;
         }
-        KeyCode::Char('t') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('t') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.cycle_theme();
             return;
         }
         KeyCode::Char('S')
-            if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search =>
+            if modifiers.contains(KeyModifiers::SHIFT) && !in_copilot_chat && app.focus != Focus::Search =>
         {
             app.toggle_settings();
             return;
         }
-        KeyCode::Char('g') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('g') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             let _ = webbrowser::open("https://github.com/yashksaini-coder/oracle");
             return;
         }
         KeyCode::Char('C')
-            if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search =>
+            if modifiers.contains(KeyModifiers::SHIFT) && !in_copilot_chat && app.focus != Focus::Search =>
         {
             if app.selected_item().is_some() {
                 app.toggle_copilot_chat();
@@ -306,7 +333,7 @@ fn handle_key_event(
             }
             return;
         }
-        KeyCode::Char('s') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('s') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             let _ = webbrowser::open("https://github.com/sponsors/yashksaini-coder");
             return;
         }
@@ -345,30 +372,30 @@ fn handle_key_event(
         return;
     }
 
-    // Tab switching with number keys
+    // Tab switching with number keys (not when typing in Copilot chat)
     match code {
-        KeyCode::Char('1') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('1') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.current_tab = Tab::Types;
             app.list_state.select(Some(0));
             app.filter_items();
             animation.on_tab_change();
             return;
         }
-        KeyCode::Char('2') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('2') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.current_tab = Tab::Functions;
             app.list_state.select(Some(0));
             app.filter_items();
             animation.on_tab_change();
             return;
         }
-        KeyCode::Char('3') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('3') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.current_tab = Tab::Modules;
             app.list_state.select(Some(0));
             app.filter_items();
             animation.on_tab_change();
             return;
         }
-        KeyCode::Char('4') if modifiers.is_empty() && app.focus != Focus::Search => {
+        KeyCode::Char('4') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
             app.current_tab = Tab::Crates;
             app.list_state.select(Some(0));
             if app.installed_crates_list.is_empty() {

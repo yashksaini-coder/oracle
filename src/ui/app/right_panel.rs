@@ -2,16 +2,83 @@
 
 use crate::ui::dependency_view::{self, DependencyDocView, DependencyView};
 use crate::ui::inspector::InspectorPanel;
+use crate::ui::theme::Theme;
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{block::BorderType, Block, Borders, Paragraph, Widget, Wrap},
+    widgets::{
+        block::BorderType, Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, StatefulWidget, Widget, Wrap,
+    },
 };
 
 use super::types::{Focus, Tab};
 use super::OracleUi;
+
+/// Parse a line of markdown into styled spans: **bold**, `code`, ## header.
+fn markdown_line_to_spans(line: &str, theme: &Theme, base_style: Style) -> Vec<Span<'static>> {
+    let mut spans: Vec<Span> = Vec::new();
+    let bold = base_style.add_modifier(Modifier::BOLD);
+    let code_style = theme.style_type();
+    let header_style = theme.style_accent().add_modifier(Modifier::BOLD);
+
+    let mut s = line;
+    if s.starts_with("## ") {
+        spans.push(Span::styled("  ", theme.style_dim()));
+        spans.push(Span::styled(
+            s.trim_start_matches("## ").to_string(),
+            header_style,
+        ));
+        return spans;
+    }
+    if s.starts_with("# ") {
+        spans.push(Span::styled("  ", theme.style_dim()));
+        spans.push(Span::styled(
+            s.trim_start_matches("# ").to_string(),
+            header_style,
+        ));
+        return spans;
+    }
+
+    while !s.is_empty() {
+        if let Some(rest) = s.strip_prefix("**") {
+            if let Some(end) = rest.find("**") {
+                spans.push(Span::styled(rest[..end].to_string(), bold));
+                s = &rest[end + 2..];
+                continue;
+            }
+        }
+        if s.starts_with('`') {
+            if let Some(end) = s[1..].find('`') {
+                let code = &s[1..=end];
+                spans.push(Span::styled(code.to_string(), code_style));
+                s = &s[end + 2..];
+                continue;
+            }
+        }
+        let next_bold = s.find("**");
+        let next_code = s.find('`');
+        let next = match (next_bold, next_code) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (Some(a), None) => Some(a),
+            (None, Some(b)) => Some(b),
+            (None, None) => None,
+        };
+        match next {
+            Some(i) => {
+                spans.push(Span::styled(s[..i].to_string(), base_style));
+                s = &s[i..];
+            }
+            None => {
+                spans.push(Span::styled(s.to_string(), base_style));
+                break;
+            }
+        }
+    }
+    spans
+}
 
 impl<'a> OracleUi<'a> {
     pub(super) fn render_vertical_divider(&self, area: Rect, buf: &mut Buffer) {
@@ -267,7 +334,7 @@ impl<'a> OracleUi<'a> {
         }
         for (role, content) in self.copilot_chat_messages.iter() {
             let label = if role == "user" { "You" } else { "Copilot" };
-            let style = if role == "user" {
+            let base_style = if role == "user" {
                 self.theme.style_accent()
             } else {
                 self.theme.style_normal()
@@ -276,20 +343,51 @@ impl<'a> OracleUi<'a> {
                 format!("  {}: ", label),
                 self.theme.style_dim().add_modifier(Modifier::BOLD),
             )));
-            for line in content.lines() {
-                lines.push(Line::from(vec![
-                    Span::raw("    "),
-                    Span::styled(line.to_string(), style),
-                ]));
+            for raw_line in content.lines() {
+                let trimmed = raw_line.trim_end();
+                if role == "assistant" {
+                    let mut sp = vec![Span::raw("    ")];
+                    sp.extend(markdown_line_to_spans(trimmed, self.theme, base_style));
+                    lines.push(Line::from(sp));
+                } else {
+                    lines.push(Line::from(vec![
+                        Span::raw("    "),
+                        Span::styled(trimmed.to_string(), base_style),
+                    ]));
+                }
             }
             lines.push(Line::from(""));
         }
 
-        let scroll = self.copilot_chat_scroll.min(lines.len().saturating_sub(1));
+        let total_lines = lines.len();
+        let visible_height = messages_area.height as usize;
+        let max_scroll = total_lines.saturating_sub(visible_height).max(0);
+        let scroll = self.copilot_chat_scroll.min(max_scroll);
+
+        let content_area = Rect {
+            width: messages_area.width.saturating_sub(1),
+            ..messages_area
+        };
         let paragraph = Paragraph::new(lines.clone())
             .wrap(Wrap { trim: false })
             .scroll((0, scroll as u16));
-        paragraph.render(messages_area, buf);
+        paragraph.render(content_area, buf);
+
+        if total_lines > visible_height {
+            let scrollbar_area = Rect {
+                x: messages_area.x + messages_area.width.saturating_sub(1),
+                y: messages_area.y,
+                width: 1,
+                height: messages_area.height,
+            };
+            let mut scrollbar_state = ScrollbarState::new(total_lines)
+                .position(scroll)
+                .viewport_content_length(visible_height);
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓"));
+            scrollbar.render(scrollbar_area, buf, &mut scrollbar_state);
+        }
 
         let input_display: &str = if self.copilot_chat_input.is_empty() {
             "Ask about this item… (Enter to send, Esc to close)"
