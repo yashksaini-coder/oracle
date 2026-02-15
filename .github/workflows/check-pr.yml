@@ -99,7 +99,7 @@ jobs:
   # Prevent merging PRs with "do not merge" label
   do-not-merge:
     name: Prevent Merging
-    if: ${{ contains(github.event.*.labels.*.name, 'do not merge') }}
+    if: ${{ contains(github.event.pull_request.labels.*.name, 'do not merge') }}
     runs-on: ubuntu-latest
     steps:
       - name: Block merge
