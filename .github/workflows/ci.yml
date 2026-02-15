@@ -28,8 +28,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: nightly
           components: rustfmt
       - name: Check formatting
         run: cargo fmt --all -- --check
@@ -53,6 +54,8 @@ jobs:
         with:
           persist-credentials: false
       - uses: bnjbvr/cargo-machete@main
+      - name: Run cargo machete with metadata
+        run: cargo machete --with-metadata
 
   # Clippy linting with strict settings
   lint-clippy:
@@ -105,25 +108,24 @@ jobs:
           command: check ${{ matrix.checks }}
           arguments: --all-features
 
-  # Type checking on multiple platforms
+  # Type checking on multiple platforms (stable = Cargo that supports Cargo.lock v4; MSRV in Cargo.toml)
   check:
-    name: Check (${{ matrix.os }} / ${{ matrix.toolchain }})
+    name: Check (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        toolchain: [stable, "1.75.0"]  # stable + MSRV
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ matrix.toolchain }}
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          key: ${{ matrix.os }}-${{ matrix.toolchain }}
+          key: ${{ matrix.os }}
       - name: Type check
         run: cargo check --all-targets --all-features
 

@@ -13,6 +13,10 @@ homepage = "https://github.com/yashksaini-coder/oracle"
 documentation = "https://docs.rs/oracle"
 readme = "README.md"
 
+[package.metadata.cargo-machete]
+# reqwest with "blocking" can pull in tokio; we use blocking client only, no direct tokio API
+ignored = ["tokio"]
+
 [[bin]]
 name = "oracle"
 path = "src/main.rs"
@@ -25,9 +29,6 @@ path = "src/lib.rs"
 # TUI Framework
 ratatui = "0.29"
 crossterm = "0.28"
-
-# Async Runtime
-tokio = { version = "1", features = ["full"] }
 
 # Code Parsing & Analysis
 syn = { version = "2.0", features = ["full", "extra-traits", "parsing"] }
@@ -61,9 +62,6 @@ dotenvy = "0.15"
 
 # Dependency graph visualization
 petgraph = "0.8"
-
-[dev-dependencies]
-tempfile = "3"
 
 [profile.release]
 opt-level = 3

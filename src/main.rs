@@ -408,7 +408,7 @@ fn handle_list_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                 app.focus = Focus::Inspector;
             }
         }
-        KeyCode::Char('o') | KeyCode::Char('c') if modifiers.is_empty() => {
+        KeyCode::Char('o' | 'c') if modifiers.is_empty() => {
             if app.current_tab == Tab::Crates {
                 if let Some(name) = app.selected_crate_name_for_display() {
                     let url = if code == KeyCode::Char('c') {
@@ -493,7 +493,7 @@ fn handle_inspector_input(
         KeyCode::Home | KeyCode::Char('g') => {
             *inspector_scroll = 0;
         }
-        KeyCode::Char('o') | KeyCode::Char('c') if modifiers.is_empty() => {
+        KeyCode::Char('o' | 'c') if modifiers.is_empty() => {
             if app.current_tab == Tab::Crates {
                 if let Some(name) = app.selected_crate_name_for_display() {
                     let url = if code == KeyCode::Char('c') {

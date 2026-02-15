@@ -3,6 +3,8 @@
 
 [default.extend-words]
 # Add any project-specific words that should not be flagged as typos
+ratatui = "ratatui"
+Ratatui = "Ratatui"
 
 [files]
 extend-exclude = [

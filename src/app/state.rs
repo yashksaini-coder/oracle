@@ -143,7 +143,7 @@ impl App {
                     }
                 }
                 Err(e) => {
-                    self.status_message = format!("Cargo analysis failed: {}", e);
+                    self.status_message = format!("Cargo analysis failed: {e}");
                 }
             }
         }
@@ -467,7 +467,7 @@ impl App {
                         format!("{}: {} items", name, self.installed_crate_items.len());
                 }
                 Err(e) => {
-                    self.status_message = format!("Analysis failed: {}", e);
+                    self.status_message = format!("Analysis failed: {e}");
                 }
             }
         }

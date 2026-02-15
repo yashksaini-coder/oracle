@@ -90,18 +90,22 @@ impl<'a> OracleUi<'a> {
         }
     }
 
+    #[must_use]
     pub fn items(mut self, items: &'a [AnalyzedItem]) -> Self {
         self.items = items;
         self
     }
+    #[must_use]
     pub fn all_items_impl_lookup(mut self, items: Option<&'a [AnalyzedItem]>) -> Self {
         self.all_items_impl_lookup = items;
         self
     }
+    #[must_use]
     pub fn filtered_items(mut self, items: &'a [&'a AnalyzedItem]) -> Self {
         self.filtered_items = items;
         self
     }
+    #[must_use]
     pub fn selected_installed_crate(
         mut self,
         crate_info: Option<&'a crate::analyzer::InstalledCrate>,
@@ -109,86 +113,107 @@ impl<'a> OracleUi<'a> {
         self.selected_installed_crate = crate_info;
         self
     }
+    #[must_use]
     pub fn installed_crate_items(mut self, items: &'a [&'a AnalyzedItem]) -> Self {
         self.installed_crate_items = items;
         self
     }
+    #[must_use]
     pub fn target_size_bytes(mut self, bytes: Option<u64>) -> Self {
         self.target_size_bytes = bytes;
         self
     }
+    #[must_use]
     pub fn list_selected(mut self, selected: Option<usize>) -> Self {
         self.list_selected = selected;
         self
     }
+    #[must_use]
     pub fn candidates(mut self, candidates: &'a [CompletionCandidate]) -> Self {
         self.candidates = candidates;
         self
     }
+    #[must_use]
     pub fn crate_info(mut self, info: Option<&'a CrateInfo>) -> Self {
         self.crate_info = info;
         self
     }
+    #[must_use]
     pub fn dependency_tree(mut self, tree: &'a [(String, usize)]) -> Self {
         self.dependency_tree = tree;
         self
     }
+    #[must_use]
     pub fn filtered_dependency_indices(mut self, indices: &'a [usize]) -> Self {
         self.filtered_dependency_indices = indices;
         self
     }
+    #[must_use]
     pub fn crate_doc(mut self, doc: Option<&'a CrateDocInfo>) -> Self {
         self.crate_doc = doc;
         self
     }
+    #[must_use]
     pub fn crate_doc_loading(mut self, loading: bool) -> Self {
         self.crate_doc_loading = loading;
         self
     }
+    #[must_use]
     pub fn crate_doc_failed(mut self, failed: bool) -> Self {
         self.crate_doc_failed = failed;
         self
     }
+    #[must_use]
     pub fn search_input(mut self, input: &'a str) -> Self {
         self.search_input = input;
         self
     }
+    #[must_use]
     pub fn current_tab(mut self, tab: Tab) -> Self {
         self.current_tab = tab;
         self
     }
+    #[must_use]
     pub fn focus(mut self, focus: Focus) -> Self {
         self.focus = focus;
         self
     }
+    #[must_use]
     pub fn selected_item(mut self, item: Option<&'a AnalyzedItem>) -> Self {
         self.selected_item = item;
         self
     }
+    #[must_use]
     pub fn completion_selected(mut self, index: usize) -> Self {
         self.completion_selected = index;
         self
     }
+    #[must_use]
     pub fn show_completion(mut self, show: bool) -> Self {
         self.show_completion = show;
         self
     }
+    #[must_use]
     pub fn show_help(mut self, show: bool) -> Self {
         self.show_help = show;
         self
     }
+    #[must_use]
     pub fn show_settings(mut self, show: bool) -> Self {
         self.show_settings = show;
         self
     }
+    #[must_use]
     pub fn status_message(mut self, msg: &'a str) -> Self {
         self.status_message = msg;
         self
     }
+    #[must_use]
     pub fn inspector_scroll(mut self, scroll: usize) -> Self {
         self.inspector_scroll = scroll;
         self
     }
+    #[must_use]
     pub fn animation_state(mut self, animation: &'a AnimationState) -> Self {
         self.animation = Some(animation);
         self
