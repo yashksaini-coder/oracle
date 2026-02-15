@@ -66,15 +66,12 @@ fn markdown_line_to_spans(line: &str, theme: &Theme, base_style: Style) -> Vec<S
             (None, Some(b)) => Some(b),
             (None, None) => None,
         };
-        match next {
-            Some(i) => {
-                spans.push(Span::styled(s[..i].to_string(), base_style));
-                s = &s[i..];
-            }
-            None => {
-                spans.push(Span::styled(s.to_string(), base_style));
-                break;
-            }
+        if let Some(i) = next {
+            spans.push(Span::styled(s[..i].to_string(), base_style));
+            s = &s[i..];
+        } else {
+            spans.push(Span::styled(s.to_string(), base_style));
+            break;
         }
     }
     spans
@@ -325,14 +322,17 @@ impl<'a> OracleUi<'a> {
 
         let mut lines: Vec<Line<'_>> = Vec::new();
         if self.copilot_chat_loading
-            && self.copilot_chat_messages.last().map(|(r, _)| r == "user") == Some(true)
+            && self
+                .copilot_chat_messages
+                .last()
+                .is_some_and(|(r, _)| r == "user")
         {
             lines.push(Line::from(Span::styled(
                 "  … Copilot is thinking…",
                 self.theme.style_muted(),
             )));
         }
-        for (role, content) in self.copilot_chat_messages.iter() {
+        for (role, content) in self.copilot_chat_messages {
             let label = if role == "user" { "You" } else { "Copilot" };
             let base_style = if role == "user" {
                 self.theme.style_accent()

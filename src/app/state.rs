@@ -12,6 +12,7 @@ use crate::utils::dir_size;
 
 use ratatui::widgets::ListState;
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::mpsc;
@@ -795,20 +796,19 @@ impl App {
         self.copilot_chat_messages
             .push(("user".to_string(), input.clone()));
 
-        let context = match self.build_copilot_context() {
-            Some(c) => c,
-            None => {
-                self.copilot_chat_messages
-                    .push(("assistant".to_string(), "No item selected.".to_string()));
-                return;
-            }
+        let context = if let Some(c) = self.build_copilot_context() {
+            c
+        } else {
+            self.copilot_chat_messages
+                .push(("assistant".to_string(), "No item selected.".to_string()));
+            return;
         };
 
         let mut full_prompt = context;
         full_prompt.push_str("\n\n**Conversation:**\n");
         for (role, content) in &self.copilot_chat_messages {
             let label = if role == "user" { "User" } else { "Assistant" };
-            full_prompt.push_str(&format!("{}: {}\n", label, content));
+            let _ = writeln!(full_prompt, "{}: {}", label, content);
         }
         full_prompt.push_str("\nRespond to the user's latest message above.");
 

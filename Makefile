@@ -1,6 +1,6 @@
 # Oracle - Rust Code Inspector - Extended Makefile
 
-.PHONY: all build release run clean test lint lint-fix typecheck fmt fmt-fix check dev-setup install publish-dry-run publish help
+.PHONY: all build release run clean test lint lint-fix typecheck fmt fmt-fix check fix dev-setup install publish-dry-run publish clippy clippy-fix clippy-beta machete help
 
 all: help
 
@@ -57,7 +57,7 @@ fmt-fix:
 	cargo fmt --all
 
 check: fmt lint typecheck test machete clippy clippy-beta
-fix: fmt-fix lint-fix
+fix: fmt-fix lint-fix clippy-fix
 
 clippy:
 	@echo "🧹 Running strict clippy (pedantic, etc)..."
@@ -103,6 +103,51 @@ clippy:
 		-A clippy::elidable_lifetime_names \
 		-A clippy::comparison_chain \
 		-A clippy::if_not_else
+
+clippy-fix:
+	@echo "🔧 Applying clippy auto-fixes (machine-applicable only)..."
+	cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features -- \
+		-D warnings \
+		-D clippy::all \
+		-D clippy::pedantic \
+		-A clippy::module_name_repetitions \
+		-A clippy::must_use_candidate \
+		-A clippy::missing_errors_doc \
+		-A clippy::missing_panics_doc \
+		-A clippy::too_many_lines \
+		-A clippy::cast_possible_truncation \
+		-A clippy::cast_precision_loss \
+		-A clippy::cast_sign_loss \
+		-A clippy::similar_names \
+		-A clippy::needless_raw_string_hashes \
+		-A clippy::unreadable_literal \
+		-A clippy::doc_markdown \
+		-A clippy::redundant_closure_for_method_calls \
+		-A clippy::unused_self \
+		-A clippy::match_same_arms \
+		-A clippy::wildcard_imports \
+		-A clippy::return_self_not_must_use \
+		-A clippy::needless_pass_by_value \
+		-A clippy::ref_option \
+		-A clippy::doc_link_with_quotes \
+		-A clippy::case_sensitive_file_extension_comparisons \
+		-A clippy::option_if_let_else \
+		-A clippy::single_match \
+		-A clippy::struct_field_names \
+		-A clippy::needless_lifetimes \
+		-A clippy::map_unwrap_or \
+		-A clippy::match_wild_err_arm \
+		-A clippy::if_same_then_else \
+		-A clippy::range_plus_one \
+		-A clippy::branches_sharing_code \
+		-A clippy::manual_let_else \
+		-A clippy::uninlined_format_args \
+		-A clippy::stable_sort_primitive \
+		-A clippy::struct_excessive_bools \
+		-A clippy::match_wildcard_for_single_variants \
+		-A clippy::elidable_lifetime_names \
+		-A clippy::comparison_chain \
+		-A clippy::if_not_else || true
 
 clippy-beta:
 	@echo "🧹 Running strict clippy (pedantic, etc) on beta toolchain..."
@@ -175,8 +220,10 @@ help:
 	@echo "  fmt          Check code format"
 	@echo "  fmt-fix      Fix code format"
 	@echo "  check        Format + Lint + Typecheck + Test"
+	@echo "  fix          Apply format + lint + clippy auto-fixes (fmt-fix, lint-fix, clippy-fix)"
 	@echo "  dev-setup    Install required Rust components"
 	@echo "  clippy       Run strict clippy (pedantic, etc)"
+	@echo "  clippy-fix   Apply strict clippy auto-fixes (machine-applicable only)"
 	@echo "  clippy-beta  Run strict clippy (pedantic, etc) on beta toolchain"
 	@echo "  machete      Check for unused dependencies (cargo machete)"
 	@echo "  help         Show this help message"
