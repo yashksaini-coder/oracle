@@ -17,6 +17,9 @@ use oracle_lib::{
 };
 use ratatui::layout::Rect;
 use ratatui::{backend::CrosstermBackend, Terminal};
+use std::io::Write;
+use std::path::Path;
+use std::process::Command;
 use std::{env, io, path::PathBuf, time::Duration};
 
 fn main() -> Result<()> {
@@ -82,6 +85,20 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
             inspector_scroll = 0;
             animation.on_selection_change();
             last_selected = current_selected;
+        }
+
+        // Run Copilot CLI with current inspector item as context (leaves TUI, then returns)
+        if app.run_copilot {
+            if let Some(context) = build_copilot_context(app) {
+                let project_path = app.project_path.as_deref();
+                if let Err(e) = run_copilot_with_context(terminal, &context, project_path) {
+                    app.status_message = format!("Copilot: {}", e);
+                } else {
+                    app.status_message = "Back from Copilot".into();
+                }
+            }
+            app.run_copilot = false;
+            continue;
         }
 
         // Poll crate docs channel and maybe start fetch for selected dependency
@@ -212,6 +229,82 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
     Ok(())
 }
 
+/// Build a context string for Copilot from the currently selected inspector item.
+fn build_copilot_context(app: &App) -> Option<String> {
+    let item = app.selected_item()?;
+    let loc = item
+        .source_location()
+        .and_then(|l| l.file.as_ref())
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "unknown".to_string());
+    let line = item
+        .source_location()
+        .and_then(|l| l.line)
+        .map(|n| format!(":{}", n))
+        .unwrap_or_default();
+    let mut ctx = format!(
+        "I'm inspecting this Rust item in Oracle TUI. Use it as context for my question.\n\n\
+         **Item:** {} {}\n**Location:** {}{}\n**Definition:**\n```rust\n{}\n```\n",
+        item.kind(),
+        item.qualified_name(),
+        loc,
+        line,
+        item.definition(),
+    );
+    if let Some(doc) = item.documentation() {
+        let doc = doc.lines().take(10).collect::<Vec<_>>().join("\n");
+        ctx.push_str("\n**Docs:**\n");
+        ctx.push_str(&doc);
+        ctx.push('\n');
+    }
+    ctx.push_str("\n---\nAsk me anything about this item (e.g. explain it, suggest changes, find usages).");
+    Some(ctx)
+}
+
+/// Leave TUI, run `copilot -i <context>`, then re-enter TUI.
+fn run_copilot_with_context(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    context: &str,
+    project_path: Option<&Path>,
+) -> Result<()> {
+    use crossterm::cursor::SetCursorStyle;
+
+    // Leave alternate screen and restore terminal so Copilot can take over
+    disable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(
+        stdout,
+        LeaveAlternateScreen,
+        crossterm::event::DisableMouseCapture,
+        SetCursorStyle::DefaultUserShape,
+    )?;
+    stdout.flush()?;
+
+    let mut cmd = Command::new("copilot");
+    cmd.arg("-i").arg(context);
+    if let Some(p) = project_path {
+        cmd.arg("--add-dir").arg(p);
+    }
+    cmd.arg("--allow-all-paths");
+    let status = cmd.status();
+
+    // Re-enter TUI
+    enable_raw_mode()?;
+    execute!(
+        stdout,
+        EnterAlternateScreen,
+        crossterm::event::EnableMouseCapture,
+    )?;
+    stdout.flush()?;
+    terminal.hide_cursor()?;
+
+    match status {
+        Ok(s) if s.success() => Ok(()),
+        Ok(s) => anyhow::bail!("copilot exited with {}", s),
+        Err(e) => anyhow::bail!("failed to run copilot: {}", e),
+    }
+}
+
 fn handle_key_event(
     app: &mut App,
     code: KeyCode,
@@ -243,6 +336,16 @@ fn handle_key_event(
         }
         KeyCode::Char('g') if modifiers.is_empty() && app.focus != Focus::Search => {
             let _ = webbrowser::open("https://github.com/yashksaini-coder/oracle");
+            return;
+        }
+        KeyCode::Char('C')
+            if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search =>
+        {
+            if app.selected_item().is_some() {
+                app.run_copilot = true;
+            } else {
+                app.status_message = "Select an item in the list to ask Copilot about it".into();
+            }
             return;
         }
         KeyCode::Char('s') if modifiers.is_empty() && app.focus != Focus::Search => {

@@ -54,6 +54,8 @@ pub struct App {
 
     // Control
     pub should_quit: bool,
+    /// When true, main loop will run Copilot CLI with current inspector item as context.
+    pub run_copilot: bool,
     pub project_path: Option<PathBuf>,
     /// Size of target/ directory in bytes (build artifacts), if computed.
     pub target_size_bytes: Option<u64>,
@@ -97,6 +99,7 @@ impl App {
             settings: Settings::default(),
             theme: Theme::default(),
             should_quit: false,
+            run_copilot: false,
             project_path: None,
             target_size_bytes: None,
             crate_docs_cache: HashMap::new(),

@@ -130,6 +130,10 @@ impl<'a> OracleUi<'a> {
             Line::from(""),
             Line::from(Span::styled("Other", self.theme.style_dim())),
             Line::from(vec![
+                Span::styled("  C          ", self.theme.style_accent()),
+                Span::raw("Ask Copilot about current item (GitHub Copilot CLI)"),
+            ]),
+            Line::from(vec![
                 Span::styled("  q          ", self.theme.style_accent()),
                 Span::raw("Quit"),
             ]),
