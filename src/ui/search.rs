@@ -108,6 +108,7 @@ impl Widget for SearchBar<'_> {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(border_style)
+            .style(Style::default().bg(self.theme.bg_panel))
             .title(" Search ");
 
         let inner = block.inner(area);

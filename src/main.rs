@@ -6,14 +6,16 @@ use anyhow::Result;
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+        MouseButton, MouseEventKind,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use oracle_lib::{
     app::App,
-    ui::{app::Focus, app::Tab, AnimationState, OracleUi},
+    ui::{app::tabs_rect_for_area, app::Focus, app::Tab, AnimationState, OracleUi},
 };
+use ratatui::layout::Rect;
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{env, io, path::PathBuf, time::Duration};
 
@@ -152,16 +154,56 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
         };
 
         if event::poll(poll_duration)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    handle_key_event(
-                        app,
-                        key.code,
-                        key.modifiers,
-                        &mut inspector_scroll,
-                        &mut animation,
-                    );
+            match event::read()? {
+                Event::Key(key) => {
+                    if key.kind == KeyEventKind::Press {
+                        handle_key_event(
+                            app,
+                            key.code,
+                            key.modifiers,
+                            &mut inspector_scroll,
+                            &mut animation,
+                        );
+                    }
                 }
+                Event::Mouse(mouse) => {
+                    if let MouseEventKind::Down(MouseButton::Left) = mouse.kind {
+                        if let Ok(size) = terminal.size() {
+                            let area = Rect::new(0, 0, size.width, size.height);
+                            if let Some(tabs_rect) = tabs_rect_for_area(area) {
+                                let col = mouse.column;
+                                let row = mouse.row;
+                                if col >= tabs_rect.x
+                                    && col < tabs_rect.x + tabs_rect.width
+                                    && row >= tabs_rect.y
+                                    && row < tabs_rect.y + tabs_rect.height
+                                {
+                                    let tab_count = 4u16;
+                                    let inner_w = tabs_rect.width.saturating_sub(2);
+                                    if inner_w >= tab_count {
+                                        let tab_width = inner_w / tab_count;
+                                        let inner_x = tabs_rect.x + 1;
+                                        let rel = col.saturating_sub(inner_x);
+                                        let idx = (rel / tab_width).min(3) as usize;
+                                        let new_tab = Tab::from_index(idx);
+                                        if app.current_tab != new_tab {
+                                            app.current_tab = new_tab;
+                                            app.list_state.select(Some(0));
+                                            if app.current_tab == Tab::Crates
+                                                && app.installed_crates_list.is_empty()
+                                            {
+                                                let _ = app.scan_installed_crates();
+                                            }
+                                            app.filter_items();
+                                            animation.on_tab_change();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -196,6 +238,14 @@ fn handle_key_event(
             if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search =>
         {
             app.toggle_settings();
+            return;
+        }
+        KeyCode::Char('g') if modifiers.is_empty() && app.focus != Focus::Search => {
+            let _ = webbrowser::open("https://github.com/yashksaini-coder/oracle");
+            return;
+        }
+        KeyCode::Char('s') if modifiers.is_empty() && app.focus != Focus::Search => {
+            let _ = webbrowser::open("https://github.com/sponsors/yashksaini-coder");
             return;
         }
         KeyCode::Esc => {

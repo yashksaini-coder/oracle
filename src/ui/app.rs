@@ -16,6 +16,7 @@ use ratatui::{
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
+        block::BorderType,
         Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
         StatefulWidget, Widget,
     },
@@ -294,69 +295,12 @@ impl<'a> OracleUi<'a> {
         self
     }
 
-    fn render_header(&self, area: Rect, buf: &mut Buffer) {
-        // Clean ASCII art banner
-        let banner = [
-            " ██████╗ ██████╗  █████╗  ██████╗██╗     ███████╗",
-            "██╔═══██╗██╔══██╗██╔══██╗██╔════╝██║     ██╔════╝",
-            "██║   ██║██████╔╝███████║██║     ██║     █████╗  ",
-            "██║   ██║██╔══██╗██╔══██║██║     ██║     ██╔══╝  ",
-            "╚██████╔╝██║  ██║██║  ██║╚██████╗███████╗███████╗",
-            " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝",
-        ];
-
-        let crate_name = self.crate_info.map(|c| c.name.as_str()).unwrap_or("oracle");
-        let version = self
-            .crate_info
-            .map(|c| format!("v{}", c.version))
-            .unwrap_or_else(|| "v0.1.0".to_string());
-
-        let mut lines: Vec<Line> = banner
-            .iter()
-            .map(|line| Line::from(Span::styled(*line, self.theme.style_accent())))
-            .collect();
-
-        if area.height >= 8 {
-            lines.push(Line::from(""));
-            lines.push(Line::from(vec![
-                Span::styled("Rust Code Inspector", self.theme.style_accent_bold()),
-                Span::styled("  ·  ", self.theme.style_muted()),
-                Span::styled(crate_name, self.theme.style_normal()),
-                Span::styled(format!(" {}", version), self.theme.style_dim()),
-            ]));
-            lines.push(Line::from(vec![
-                Span::styled("Press ", self.theme.style_dim()),
-                Span::styled("?", self.theme.style_accent()),
-                Span::styled(" help  ", self.theme.style_dim()),
-                Span::styled("q", self.theme.style_accent()),
-                Span::styled(" quit  ", self.theme.style_dim()),
-                Span::styled("Tab", self.theme.style_accent()),
-                Span::styled(" switch", self.theme.style_dim()),
-            ]));
-        }
-
-        let block = Block::default()
-            .borders(Borders::BOTTOM)
-            .border_style(self.theme.style_border());
-        let inner = block.inner(area);
-        block.render(area, buf);
-        Paragraph::new(lines)
-            .alignment(Alignment::Center)
-            .render(inner, buf);
-    }
-
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
-        let tab_width = 42;
-        let margin = area.width.saturating_sub(tab_width) / 2;
-        let tab_rect = Rect {
-            x: area.x + margin,
-            y: area.y,
-            width: tab_width.min(area.width),
-            height: area.height,
-        };
         let titles: Vec<&str> = Tab::all().iter().map(|t| t.title()).collect();
-        let tab_bar = TabBar::new(titles, self.theme).select(self.current_tab.index());
-        tab_bar.render(tab_rect, buf);
+        let tab_bar = TabBar::new(titles, self.theme)
+            .select(self.current_tab.index())
+            .focused(self.focus == Focus::Inspector);
+        tab_bar.render(area, buf);
     }
 
     fn render_search(&self, area: Rect, buf: &mut Buffer) {
@@ -531,6 +475,7 @@ impl<'a> OracleUi<'a> {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(border_style)
+                    .style(Style::default().bg(self.theme.bg_panel))
                     .title(title),
             )
             .highlight_style(self.theme.style_selected())
@@ -653,6 +598,7 @@ impl<'a> OracleUi<'a> {
                 Block::default()
                     .borders(Borders::ALL)
                     .border_style(border_style)
+                    .style(Style::default().bg(self.theme.bg_panel))
                     .title(title),
             )
             .highlight_style(self.theme.style_selected())
@@ -780,10 +726,11 @@ impl<'a> OracleUi<'a> {
             };
             let list = List::new(items)
                 .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(border_style)
-                        .title(title),
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(border_style)
+                    .style(Style::default().bg(self.theme.bg_panel))
+                    .title(title),
                 )
                 .highlight_style(self.theme.style_selected());
 
@@ -801,6 +748,18 @@ impl<'a> OracleUi<'a> {
                     .begin_symbol(Some("↑"))
                     .end_symbol(Some("↓"));
                 StatefulWidget::render(scrollbar, scrollbar_area, buf, &mut state);
+            }
+        }
+    }
+
+    fn render_vertical_divider(&self, area: Rect, buf: &mut Buffer) {
+        let style = self.theme.style_border();
+        let symbol = "│";
+        for y in area.top()..area.bottom() {
+            if area.width > 0 {
+                if let Some(cell) = buf.cell_mut((area.x, y)) {
+                    cell.set_symbol(symbol).set_style(style);
+                }
             }
         }
     }
@@ -1060,16 +1019,33 @@ impl<'a> OracleUi<'a> {
                         Span::styled(" │ ", self.theme.style_muted()),
                         Span::styled(selection_info, self.theme.style_muted()),
                         Span::styled(" │ ", self.theme.style_muted()),
-                        Span::styled(focus_indicator.0, self.theme.style_accent()),
-                        Span::styled(format!(" {} ", focus_indicator.1), self.theme.style_dim()),
-                        Span::styled("│ Esc: back", self.theme.style_muted()),
+                        Span::styled("Tab", self.theme.style_accent()),
+                        Span::styled(" focus ", self.theme.style_muted()),
+                        Span::styled("↑/↓ j/k", self.theme.style_accent()),
+                        Span::styled(" list ", self.theme.style_muted()),
+                        Span::styled("Enter →", self.theme.style_accent()),
+                        Span::styled(" details ", self.theme.style_muted()),
+                        Span::styled("/", self.theme.style_accent()),
+                        Span::styled(" search ", self.theme.style_muted()),
+                        Span::styled("Esc", self.theme.style_accent()),
+                        Span::styled(" back ", self.theme.style_muted()),
+                        Span::styled("│ ", self.theme.style_dim()),
+                        Span::styled(" [g] ", self.theme.style_accent()),
+                        Span::styled("GitHub ", self.theme.style_muted()),
+                        Span::styled("[s] ", self.theme.style_accent()),
+                        Span::styled("Sponsor", self.theme.style_muted()),
                     ])
                 } else {
                     Line::from(vec![
                         Span::styled(" 📦 Crates ", self.theme.style_accent()),
                         Span::styled(focus_indicator.0, self.theme.style_accent()),
                         Span::styled(format!(" {} ", focus_indicator.1), self.theme.style_dim()),
-                        Span::styled("│ Esc: back", self.theme.style_muted()),
+                        Span::styled(" │ Tab ↑/↓ Enter / Esc back ", self.theme.style_muted()),
+                        Span::styled("│ ", self.theme.style_dim()),
+                        Span::styled(" [g] ", self.theme.style_accent()),
+                        Span::styled("GitHub ", self.theme.style_muted()),
+                        Span::styled("[s] ", self.theme.style_accent()),
+                        Span::styled("Sponsor", self.theme.style_muted()),
                     ])
                 }
             } else if self.current_tab == Tab::Crates {
@@ -1077,12 +1053,14 @@ impl<'a> OracleUi<'a> {
                     Span::styled("Commands: ", self.theme.style_dim()),
                     Span::styled("Tab", self.theme.style_accent()),
                     Span::styled(" focus ", self.theme.style_muted()),
-                    Span::styled("↑/↓", self.theme.style_accent()),
+                    Span::styled("↑/↓ j/k", self.theme.style_accent()),
                     Span::styled(" list ", self.theme.style_muted()),
-                    Span::styled("Enter", self.theme.style_accent()),
-                    Span::styled(" open crate ", self.theme.style_muted()),
+                    Span::styled("Enter →", self.theme.style_accent()),
+                    Span::styled(" open ", self.theme.style_muted()),
+                    Span::styled("/", self.theme.style_accent()),
+                    Span::styled(" search ", self.theme.style_muted()),
                     Span::styled("[o]", self.theme.style_accent()),
-                    Span::styled(" docs.rs ", self.theme.style_muted()),
+                    Span::styled(" docs ", self.theme.style_muted()),
                     Span::styled("[c]", self.theme.style_accent()),
                     Span::styled(" crates.io ", self.theme.style_muted()),
                     Span::styled("│ ", self.theme.style_dim()),
@@ -1091,6 +1069,11 @@ impl<'a> OracleUi<'a> {
                         format!(" Crates ({}) ", self.filtered_dependency_indices.len()),
                         self.theme.style_normal(),
                     ),
+                    Span::styled("│ ", self.theme.style_dim()),
+                    Span::styled(" [g] ", self.theme.style_accent()),
+                    Span::styled("GitHub ", self.theme.style_muted()),
+                    Span::styled("[s] ", self.theme.style_accent()),
+                    Span::styled("Sponsor", self.theme.style_muted()),
                 ])
             } else if !self.status_message.is_empty() {
                 // Custom status message
@@ -1099,9 +1082,16 @@ impl<'a> OracleUi<'a> {
                         format!(" {} ", self.status_message),
                         self.theme.style_string(),
                     ),
-                    Span::styled("│ ", self.theme.style_muted()),
-                    Span::styled(focus_indicator.0, self.theme.style_accent()),
-                    Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
+                    Span::styled(" │ ", self.theme.style_muted()),
+                    Span::styled("Tab", self.theme.style_accent()),
+                    Span::styled(" focus ", self.theme.style_muted()),
+                    Span::styled("↑/↓ Enter / ", self.theme.style_accent()),
+                    Span::styled("? help q quit ", self.theme.style_muted()),
+                    Span::styled("│ ", self.theme.style_dim()),
+                    Span::styled(" [g] ", self.theme.style_accent()),
+                    Span::styled("GitHub ", self.theme.style_muted()),
+                    Span::styled("[s] ", self.theme.style_accent()),
+                    Span::styled("Sponsor", self.theme.style_muted()),
                 ])
             } else {
                 // Normal footer with counts
@@ -1126,8 +1116,12 @@ impl<'a> OracleUi<'a> {
                     Span::styled("Commands: ", self.theme.style_dim()),
                     Span::styled("Tab", self.theme.style_accent()),
                     Span::styled(" focus ", self.theme.style_muted()),
-                    Span::styled("↑/↓", self.theme.style_accent()),
+                    Span::styled("↑/↓ j/k", self.theme.style_accent()),
                     Span::styled(" list ", self.theme.style_muted()),
+                    Span::styled("Enter →", self.theme.style_accent()),
+                    Span::styled(" open ", self.theme.style_muted()),
+                    Span::styled("/", self.theme.style_accent()),
+                    Span::styled(" search ", self.theme.style_muted()),
                     Span::styled("1-4", self.theme.style_accent()),
                     Span::styled(" tabs ", self.theme.style_muted()),
                     Span::styled("? ", self.theme.style_accent()),
@@ -1141,17 +1135,24 @@ impl<'a> OracleUi<'a> {
                     Span::styled(format!("{} ", struct_count), self.theme.style_normal()),
                     Span::styled("selection ", self.theme.style_muted()),
                     Span::styled(selection_info, self.theme.style_dim()),
+                    Span::styled("│ ", self.theme.style_dim()),
+                    Span::styled(" [g] ", self.theme.style_accent()),
+                    Span::styled("GitHub ", self.theme.style_muted()),
+                    Span::styled("[s] ", self.theme.style_accent()),
+                    Span::styled("Sponsor", self.theme.style_muted()),
                 ])
             };
 
         let block = Block::default()
-            .borders(Borders::ALL)
+            .borders(Borders::TOP)
             .border_style(self.theme.style_border())
             .style(Style::default().bg(self.theme.bg_panel));
         let inner = block.inner(area);
         block.render(area, buf);
-        let paragraph = Paragraph::new(status_line).alignment(ratatui::layout::Alignment::Center);
-        paragraph.render(inner, buf);
+
+        Paragraph::new(status_line)
+            .alignment(Alignment::Left)
+            .render(inner, buf);
     }
 
     fn render_settings_overlay(&self, area: Rect, buf: &mut Buffer) {
@@ -1316,34 +1317,101 @@ impl<'a> OracleUi<'a> {
 
 impl Widget for OracleUi<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let header_height = if area.height >= 30 { 6 } else { 2 };
+        let status_height = 3u16;
+        let outer = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(self.theme.style_border_glow())
+            .style(Style::default().bg(self.theme.bg));
+        let content_area = outer.inner(area);
+        outer.render(area, buf);
+
+        let body_margin = 1u16;
+        let padded = Rect {
+            x: content_area.x + body_margin,
+            y: content_area.y + body_margin,
+            width: content_area.width.saturating_sub(2 * body_margin),
+            height: content_area.height.saturating_sub(2 * body_margin),
+        };
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Length(header_height),
-                Constraint::Length(2),
-                Constraint::Length(3),
-                Constraint::Min(10),
-                Constraint::Length(3),
-            ])
-            .split(area);
+            .constraints([Constraint::Min(12), Constraint::Length(status_height)])
+            .split(padded);
 
-        self.render_header(chunks[0], buf);
-        self.render_tabs(chunks[1], buf);
-        self.render_search(chunks[2], buf);
-
-        let content_chunks = Layout::default()
+        let body = chunks[0];
+        let left_div_right = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
-            .margin(0)
-            .split(chunks[3]);
+            .constraints([
+                Constraint::Ratio(1, 3),
+                Constraint::Length(1),
+                Constraint::Ratio(2, 3),
+            ])
+            .split(body);
 
-        self.render_list(content_chunks[0], buf);
-        self.render_inspector(content_chunks[1], buf);
-        self.render_status(chunks[4], buf);
+        let left_column = left_div_right[0];
+        let div_rect = left_div_right[1];
+        let right_column = left_div_right[2];
 
-        self.render_completion(chunks[2], buf);
+        let left_split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(6)])
+            .split(left_column);
+        let search_rect = left_split[0];
+        let list_rect = left_split[1];
+
+        let right_split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Length(3), Constraint::Min(6)])
+            .split(right_column);
+        let tabs_rect = right_split[0];
+        let inspector_rect = right_split[1];
+
+        self.render_search(search_rect, buf);
+        self.render_list(list_rect, buf);
+        self.render_vertical_divider(div_rect, buf);
+        self.render_tabs(tabs_rect, buf);
+        self.render_inspector(inspector_rect, buf);
+
+        self.render_status(chunks[1], buf);
+        self.render_completion(search_rect, buf);
         self.render_settings_overlay(area, buf);
         self.render_help_overlay(area, buf);
     }
+}
+
+/// Returns the tabs bar Rect for a given full frame area (for mouse hit testing).
+pub fn tabs_rect_for_area(area: Rect) -> Option<Rect> {
+    let status_height = 3u16;
+    let body_margin = 1u16;
+    let content_area = Rect {
+        x: area.x + 1,
+        y: area.y + 1,
+        width: area.width.saturating_sub(2),
+        height: area.height.saturating_sub(2),
+    };
+    let padded = Rect {
+        x: content_area.x + body_margin,
+        y: content_area.y + body_margin,
+        width: content_area.width.saturating_sub(2 * body_margin),
+        height: content_area.height.saturating_sub(2 * body_margin),
+    };
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(12), Constraint::Length(status_height)])
+        .split(padded);
+    let body = chunks[0];
+    let left_div_right = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Ratio(1, 3),
+            Constraint::Length(1),
+            Constraint::Ratio(2, 3),
+        ])
+        .split(body);
+    let right_column = left_div_right[2];
+    let right_split = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Length(3), Constraint::Min(6)])
+        .split(right_column);
+    Some(right_split[0])
 }

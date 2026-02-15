@@ -3,7 +3,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::Modifier,
+    style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
         block::BorderType, Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation,
@@ -90,6 +90,7 @@ impl<'a> InspectorPanel<'a> {
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(self.theme.style_border())
+            .style(Style::default().bg(self.theme.bg_panel))
             .title(" ◇ Inspector ");
 
         let inner = block.inner(area);
@@ -1259,6 +1260,7 @@ impl<'a> InspectorPanel<'a> {
             } else {
                 self.theme.style_border()
             })
+            .style(Style::default().bg(self.theme.bg_panel))
             .title(title);
 
         let inner = block.inner(area);

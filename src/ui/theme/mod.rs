@@ -72,6 +72,10 @@ pub struct Theme {
     pub fg_muted: Color,
     pub border: Color,
     pub border_focused: Color,
+    /// Active tab background (e.g. lavender)
+    pub tab_active_bg: Color,
+    /// Active tab text (dark for contrast)
+    pub tab_active_fg: Color,
     pub error: Color,
     pub warning: Color,
     pub success: Color,
@@ -95,10 +99,12 @@ impl Theme {
             bg_highlight: Color::Rgb(45, 45, 45),
             bg_panel: Color::Rgb(32, 32, 32),
             fg: Color::Rgb(230, 230, 230),
-            fg_dim: Color::Rgb(160, 160, 160),
-            fg_muted: Color::Rgb(100, 100, 100),
+            fg_dim: Color::Rgb(195, 195, 200),
+            fg_muted: Color::Rgb(140, 140, 145),
             border: Color::Rgb(60, 60, 60),
             border_focused: Color::Rgb(78, 191, 113),
+            tab_active_bg: Color::Rgb(180, 160, 220),  // Lavender
+            tab_active_fg: Color::Rgb(248, 248, 252),  // Light text on lavender (good contrast)
             error: Color::Rgb(244, 67, 54),
             warning: Color::Rgb(255, 152, 0),
             success: Color::Rgb(76, 175, 80),
@@ -121,10 +127,12 @@ impl Theme {
             bg_highlight: Color::Rgb(59, 66, 82), // Nord1
             bg_panel: Color::Rgb(67, 76, 94),     // Nord2
             fg: Color::Rgb(236, 239, 244),        // Nord6
-            fg_dim: Color::Rgb(216, 222, 233),    // Nord5
-            fg_muted: Color::Rgb(76, 86, 106),    // Nord3
+            fg_dim: Color::Rgb(229, 233, 240),    // Nord5 brighter
+            fg_muted: Color::Rgb(136, 142, 156),  // Nord3 brighter
             border: Color::Rgb(76, 86, 106),      // Nord3
             border_focused: Color::Rgb(136, 192, 208),
+            tab_active_bg: Color::Rgb(129, 161, 193),  // Nord9 blue
+            tab_active_fg: Color::Rgb(236, 239, 244),  // Nord6 light on blue
             error: Color::Rgb(191, 97, 106),     // Nord11
             warning: Color::Rgb(235, 203, 139),  // Nord13
             success: Color::Rgb(163, 190, 140),  // Nord14
@@ -148,10 +156,12 @@ impl Theme {
             bg_highlight: Color::Rgb(49, 50, 68),  // Surface0
             bg_panel: Color::Rgb(36, 39, 58),      // Mantle
             fg: Color::Rgb(205, 214, 244),         // Text
-            fg_dim: Color::Rgb(186, 194, 222),     // Subtext1
-            fg_muted: Color::Rgb(108, 112, 134),   // Overlay0
+            fg_dim: Color::Rgb(205, 214, 244),     // Text (readable)
+            fg_muted: Color::Rgb(147, 153, 178),   // Overlay0 brighter
             border: Color::Rgb(69, 71, 90),        // Surface1
             border_focused: Color::Rgb(166, 227, 161),
+            tab_active_bg: Color::Rgb(203, 166, 247),  // Mauve
+            tab_active_fg: Color::Rgb(205, 214, 244),  // Text light on mauve
             error: Color::Rgb(243, 139, 168),    // Red
             warning: Color::Rgb(249, 226, 175),  // Yellow
             success: Color::Rgb(166, 227, 161),  // Green
@@ -175,10 +185,12 @@ impl Theme {
             bg_highlight: Color::Rgb(68, 71, 90),  // Current Line
             bg_panel: Color::Rgb(33, 34, 44),      // Darker bg
             fg: Color::Rgb(248, 248, 242),         // Foreground
-            fg_dim: Color::Rgb(189, 147, 249),     // Purple (slightly dimmed)
-            fg_muted: Color::Rgb(98, 114, 164),    // Comment
+            fg_dim: Color::Rgb(230, 230, 235),
+            fg_muted: Color::Rgb(139, 153, 195),
             border: Color::Rgb(68, 71, 90),        // Current Line
             border_focused: Color::Rgb(80, 250, 123),
+            tab_active_bg: Color::Rgb(189, 147, 249),  // Purple
+            tab_active_fg: Color::Rgb(248, 248, 242),   // Foreground light on purple
             error: Color::Rgb(255, 85, 85),     // Red
             warning: Color::Rgb(255, 184, 108), // Orange
             success: Color::Rgb(80, 250, 123),  // Green
@@ -246,6 +258,21 @@ impl Theme {
 
     pub fn style_border(&self) -> Style {
         Style::default().fg(self.border)
+    }
+
+    /// Active tab: button-style highlight (e.g. lavender bg, light text).
+    pub fn style_tab_active(&self) -> Style {
+        Style::default()
+            .fg(self.tab_active_fg)
+            .bg(self.tab_active_bg)
+            .add_modifier(Modifier::BOLD)
+    }
+
+    /// Subtle accent-tinted border for the outer frame (soft glow effect).
+    pub fn style_border_glow(&self) -> Style {
+        Style::default()
+            .fg(self.accent)
+            .add_modifier(Modifier::DIM)
     }
 
     pub fn style_border_focused(&self) -> Style {

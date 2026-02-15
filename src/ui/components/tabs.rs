@@ -3,7 +3,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    style::{Modifier, Style},
+    style::Style,
     widgets::{Block, Borders, Tabs, Widget},
 };
 
@@ -14,6 +14,7 @@ pub struct TabBar<'a> {
     titles: Vec<&'a str>,
     selected: usize,
     theme: &'a Theme,
+    focused: bool,
 }
 
 impl<'a> TabBar<'a> {
@@ -22,6 +23,7 @@ impl<'a> TabBar<'a> {
             titles,
             selected: 0,
             theme,
+            focused: false,
         }
     }
 
@@ -29,25 +31,36 @@ impl<'a> TabBar<'a> {
         self.selected = index;
         self
     }
+
+    pub fn focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
+        self
+    }
 }
 
 impl Widget for TabBar<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let selected_style = Style::default()
-            .fg(self.theme.accent)
-            .bg(self.theme.bg_highlight)
-            .add_modifier(Modifier::BOLD);
+        let selected_style = self.theme.style_tab_active();
+        let inactive_style = self.theme.style_dim();
+
+        let border_style = if self.focused {
+            self.theme.style_border_focused()
+        } else {
+            self.theme.style_border()
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(border_style)
+            .style(Style::default().bg(self.theme.bg_panel))
+            .title(" Tabs ");
 
         let tabs = Tabs::new(self.titles)
             .select(self.selected)
-            .style(self.theme.style_dim())
+            .style(inactive_style)
             .highlight_style(selected_style)
-            .block(
-                Block::default()
-                    .borders(Borders::BOTTOM)
-                    .border_style(self.theme.style_border()),
-            )
-            .divider(" │ ");
+            .block(block)
+            .divider(" │ ")
+            .padding("    ", "    ");
 
         tabs.render(area, buf);
     }
