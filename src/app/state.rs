@@ -8,6 +8,7 @@ use crate::crates_io::CrateDocInfo;
 use crate::error::Result;
 use crate::ui::theme::Theme;
 use crate::ui::{filter_candidates, CandidateKind, CompletionCandidate, Focus, Tab};
+use crate::utils::dir_size;
 
 use ratatui::widgets::ListState;
 use std::collections::{HashMap, HashSet};
@@ -54,6 +55,8 @@ pub struct App {
     // Control
     pub should_quit: bool,
     pub project_path: Option<PathBuf>,
+    /// Size of target/ directory in bytes (build artifacts), if computed.
+    pub target_size_bytes: Option<u64>,
 
     // Dependency tab: fetched docs from crates.io (background thread, bounded cache)
     pub crate_docs_cache: HashMap<String, CrateDocInfo>,
@@ -95,6 +98,7 @@ impl App {
             theme: Theme::default(),
             should_quit: false,
             project_path: None,
+            target_size_bytes: None,
             crate_docs_cache: HashMap::new(),
             crate_docs_loading: None,
             crate_docs_failed: HashSet::new(),
@@ -157,6 +161,14 @@ impl App {
         self.update_candidates();
         self.filter_items();
         self.status_message = format!("Found {} items", self.items.len());
+
+        // Best-effort target/ directory size (non-blocking, ignore errors)
+        let target_dir = path.join("target");
+        if target_dir.is_dir() {
+            self.target_size_bytes = dir_size(&target_dir);
+        } else {
+            self.target_size_bytes = None;
+        }
 
         Ok(())
     }

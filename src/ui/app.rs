@@ -2,6 +2,7 @@
 
 use crate::analyzer::AnalyzedItem;
 use crate::analyzer::CrateInfo;
+use crate::utils::format_bytes;
 use crate::crates_io::CrateDocInfo;
 use crate::ui::animation::AnimationState;
 use crate::ui::components::TabBar;
@@ -121,6 +122,9 @@ pub struct OracleUi<'a> {
     selected_installed_crate: Option<&'a crate::analyzer::InstalledCrate>,
     installed_crate_items: &'a [&'a AnalyzedItem],
 
+    /// Size of target/ directory in bytes (build artifacts), for header metrics.
+    target_size_bytes: Option<u64>,
+
     // UI State
     search_input: &'a str,
     current_tab: Tab,
@@ -156,6 +160,7 @@ impl<'a> OracleUi<'a> {
             crate_doc_failed: false,
             selected_installed_crate: None,
             installed_crate_items: &[],
+            target_size_bytes: None,
             search_input: "",
             current_tab: Tab::default(),
             focus: Focus::default(),
@@ -197,6 +202,11 @@ impl<'a> OracleUi<'a> {
 
     pub fn installed_crate_items(mut self, items: &'a [&'a AnalyzedItem]) -> Self {
         self.installed_crate_items = items;
+        self
+    }
+
+    pub fn target_size_bytes(mut self, bytes: Option<u64>) -> Self {
+        self.target_size_bytes = bytes;
         self
     }
 
@@ -295,7 +305,7 @@ impl<'a> OracleUi<'a> {
         self
     }
 
-    /// Renders the header: ASCII art ORACLE logo only (no shadow, no commands).
+    /// Renders the header: left = ASCII art ORACLE logo, right = live metrics (items, crates, target size, creator).
     fn render_header(&self, area: Rect, buf: &mut Buffer) {
         const ORACLE_ART: [&str; 6] = [
             " ██████╗ ██████╗  █████╗  ██████╗██╗     ███████╗",
@@ -305,12 +315,60 @@ impl<'a> OracleUi<'a> {
             "╚██████╔╝██║  ██║██║  ██║╚██████╗███████╗███████╗",
             " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝",
         ];
-        let lines: Vec<Line> = ORACLE_ART
+
+        let (fn_count, struct_count, enum_count, trait_count, mod_count) = self.items.iter().fold(
+            (0usize, 0usize, 0usize, 0usize, 0usize),
+            |(f, s, e, t, m), item| match item.kind() {
+                "fn" => (f + 1, s, e, t, m),
+                "struct" => (f, s + 1, e, t, m),
+                "enum" => (f, s, e + 1, t, m),
+                "trait" => (f, s, e, t + 1, m),
+                "mod" => (f, s, e, t, m + 1),
+                _ => (f, s, e, t, m),
+            },
+        );
+        let types_count = struct_count + enum_count + trait_count;
+        let line1 = format!("📦 {} types · {} fns · {} mods", types_count, fn_count, mod_count);
+        let crates_count = self.dependency_tree.len();
+        let line2 = if let Some(bytes) = self.target_size_bytes {
+            format!("📚 {} crates · target {}", crates_count, format_bytes(bytes))
+        } else {
+            format!("📚 {} crates", crates_count)
+        };
+        let line3 = "👤 created by yashksaini-coder";
+
+        let header_chunks = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Min(20), Constraint::Min(30)])
+            .split(area);
+        let logo_area = header_chunks[0];
+        let tagline_area = header_chunks[1];
+        let logo_lines: Vec<Line> = ORACLE_ART
             .iter()
-            .take(area.height as usize)
+            .take(logo_area.height as usize)
             .map(|s| Line::from(Span::styled(*s, self.theme.style_accent())))
             .collect();
-        Paragraph::new(lines).render(area, buf);
+        Paragraph::new(logo_lines).render(logo_area, buf);
+
+        let row_height = tagline_area.height / 3;
+        let tagline_rows = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Length(row_height),
+                Constraint::Length(row_height),
+                Constraint::Length(tagline_area.height.saturating_sub(2 * row_height)),
+            ])
+            .split(tagline_area);
+
+        let lines_content = [line1, line2, line3.to_string()];
+        for (i, content) in lines_content.iter().enumerate() {
+            if let Some(rect) = tagline_rows.get(i) {
+                let line = Line::from(Span::styled(content.as_str(), self.theme.style_dim()));
+                Paragraph::new(line)
+                    .alignment(Alignment::Right)
+                    .render(*rect, buf);
+            }
+        }
     }
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
@@ -1407,7 +1465,7 @@ impl Widget for OracleUi<'_> {
 /// Returns the tabs bar Rect for a given full frame area (for mouse hit testing).
 pub fn tabs_rect_for_area(area: Rect) -> Option<Rect> {
     let status_height = 3u16;
-    let header_height = 6u16;
+        let header_height = 6u16;
     let body_margin = 1u16;
     let content_area = Rect {
         x: area.x + 1,
