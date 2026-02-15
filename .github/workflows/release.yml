@@ -38,6 +38,7 @@ jobs:
       
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
       
       - uses: Swatinem/rust-cache@v2
@@ -73,6 +74,8 @@ jobs:
     name: Create Release
     needs: build-release
     runs-on: ubuntu-latest
+    # Only create a GitHub Release when run from a tag (push tags: v*). Skip on workflow_dispatch (no tag).
+    if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -83,6 +86,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
           name: Oracle ${{ github.ref_name }}
           draft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
@@ -97,12 +101,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
       - name: Publish to crates.io
         run: |
-          if [ -n "$CARGO_REGISTRY_TOKEN" ]; then
-            cargo publish --token "$CARGO_REGISTRY_TOKEN"
-          else
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
             echo "CARGO_REGISTRY_TOKEN not set - skipping publish. Add it in repo secrets to publish from CI."
+            exit 0
+          fi
+          if output=$(cargo publish --token "$CARGO_REGISTRY_TOKEN" 2>&1); then
+            echo "$output"
+            echo "Published successfully."
+          else
+            echo "$output"
+            if echo "$output" | grep -q "already exists"; then
+              echo "This version is already on crates.io - skipping (bump version in Cargo.toml for new releases)."
+              exit 0
+            fi
+            exit 1
           fi
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

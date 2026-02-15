@@ -4,9 +4,10 @@
 
 <div align="center">
 
-[![CI Badge]][CI] [![License Badge]][License] [![Rust Badge]][Rust]
-
-[Installation](#installation) · [Usage](#usage) · [Keyboard Shortcuts](#keyboard-shortcuts) · [Contributing](#contributing)
+[![CI](https://github.com/yashksaini-coder/oracle/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yashksaini-coder/oracle/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://github.com/yashksaini-coder/oracle/blob/main/LICENSE)
+[![Crates.io](https://img.shields.io/crates/v/oracle?label=crates.io)](https://crates.io/crates/oracle)
+[![Rust](https://img.shields.io/badge/Rust-1.70+-blue?logo=rust)](https://www.rust-lang.org/)
 
 </div>
 
@@ -17,6 +18,8 @@ Oracle is a terminal-based application for exploring Rust codebases. It parses y
 Built with [Ratatui](https://ratatui.rs) for a smooth, responsive TUI experience.
 
 [![Built With Ratatui](https://img.shields.io/badge/Built_With_Ratatui-000?logo=ratatui&logoColor=fff)](https://ratatui.rs/)
+
+![Oracle Demo GIF](./images/demo.gif)
 
 ## ✨ Features
 
@@ -33,6 +36,9 @@ Built with [Ratatui](https://ratatui.rs) for a smooth, responsive TUI experience
 - **🎨 Multiple Themes** — Default Dark, Nord, Catppuccin Mocha, Dracula
 - **⚡ Smooth Animations** — Selection highlights, tab transitions
 - **⌨️ Vim-style Navigation** — `j/k` for movement, `/` for search
+
+![Oracle Crates Tab Demo](./images/image03.png)
+
 
 ## 📦 Installation
 
@@ -59,15 +65,12 @@ See [Releases](https://github.com/yashksaini-coder/oracle/releases) for Linux (x
 
 ## 🚀 Usage
 
+![Oracle Copilot Chat Demo](./images/image04.png)
 ```bash
-# Analyze current directory
+# Cd into the project directory
+cd path/to/rust-project
+# Analyze current directory (must be a Cargo project root or folder with .rs files)
 oracle
-
-# Analyze specific project
-oracle /path/to/rust/project
-
-# Analyze a single file
-oracle /path/to/file.rs
 ```
 
 ## ⌨️ Keyboard Shortcuts
@@ -88,6 +91,9 @@ oracle /path/to/file.rs
 ## 🛠️ Development
 
 ```bash
+# See all commands
+make
+
 # Install development tools
 make dev-setup
 
@@ -102,38 +108,12 @@ make test
 
 # Build release
 make release
-
-# See all commands
-make help
 ```
 
 ## 📤 Releasing (maintainers)
 
 - **Publish to crates.io** (after `cargo login`): `make publish-dry-run` then `make publish`.
 - **GitHub Release**: Push a version tag (e.g. `v0.1.0`). The [release workflow](.github/workflows/release.yml) builds binaries for Linux, macOS (Intel + Apple Silicon), and Windows and creates a release. Optionally set `CARGO_REGISTRY_TOKEN` in repo secrets to auto-publish to crates.io on tag push.
-
-## 🏗️ Architecture
-
-```
-src/
-├── main.rs           # Entry point, event loop
-├── lib.rs            # Library exports
-├── app/              # Application state
-├── analyzer/         # Rust code parsing (syn-based)
-│   ├── parser.rs     # Source file analyzer
-│   ├── dependency.rs # Cargo.toml analyzer
-│   └── types.rs      # Type definitions
-├── config/           # Settings and configuration
-├── error/            # Error types
-├── ui/               # TUI components
-│   ├── animation.rs  # Smooth transitions
-│   ├── app.rs        # Main widget
-│   ├── inspector.rs  # Detail panel
-│   ├── search.rs     # Search bar + completion
-│   ├── theme/        # Color themes
-│   └── components/   # Reusable widgets
-└── utils/            # Helpers and utilities
-```
 
 ## 🤝 Contributing
 
@@ -159,16 +139,3 @@ We use [Conventional Commits](https://www.conventionalcommits.org/). Examples:
 This project is licensed under the [MIT License](LICENSE).
 
 ---
-
-<div align="center">
-
-*Reverse-engineered from the Python [shira](shira/) TUI explorer for the Rust ecosystem.*
-
-</div>
-
-<!-- Badges -->
-[CI Badge]: https://img.shields.io/github/actions/workflow/status/yashksaini-coder/oracle/ci.yml?style=flat-square&logo=github&label=CI
-[CI]: https://github.com/yashksaini-coder/oracle/actions/workflows/ci.yml
-[License Badge]: https://img.shields.io/badge/license-MIT-blue?style=flat-square
-[License]: ./LICENSE
-[Rust Badge]: https://img.shields.io/badge/rust-1.75+-orange?style=flat-square&logo=rust
