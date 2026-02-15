@@ -150,6 +150,12 @@ impl App {
 
     /// Analyze a Rust project
     pub fn analyze_project(&mut self, path: &Path) -> Result<()> {
+        if !path.exists() {
+            return Err(crate::error::OracleError::Other(format!(
+                "Path does not exist: {}",
+                path.display()
+            )));
+        }
         self.project_path = Some(path.to_path_buf());
         self.status_message = format!("Analyzing {}...", path.display());
 
@@ -184,7 +190,11 @@ impl App {
 
         self.update_candidates();
         self.filter_items();
-        self.status_message = format!("Found {} items", self.items.len());
+        self.status_message = if self.items.is_empty() {
+            format!("No Rust files found in {}", path.display())
+        } else {
+            format!("Found {} items", self.items.len())
+        };
 
         // Best-effort target/ directory size (non-blocking, ignore errors)
         let target_dir = path.join("target");

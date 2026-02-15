@@ -23,12 +23,18 @@ fn main() -> Result<()> {
     // Load .env so GITHUB_TOKEN etc. are available (cwd first, then project path overrides)
     let _ = dotenvy::dotenv();
     let args: Vec<String> = env::args().collect();
-    let project_path = args
+    let mut project_path = args
         .iter()
         .skip(1)
         .find(|a| !a.starts_with('-'))
         .map(PathBuf::from)
         .unwrap_or_else(|| env::current_dir().unwrap_or(PathBuf::from(".")));
+    // Resolve to absolute path so we always analyze the directory the user expects
+    if project_path.exists() {
+        if let Ok(canon) = std::fs::canonicalize(&project_path) {
+            project_path = canon;
+        }
+    }
     let _ = dotenvy::from_path(project_path.join(".env"));
 
     // Initialize terminal
