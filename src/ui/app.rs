@@ -295,6 +295,24 @@ impl<'a> OracleUi<'a> {
         self
     }
 
+    /// Renders the header: ASCII art ORACLE logo only (no shadow, no commands).
+    fn render_header(&self, area: Rect, buf: &mut Buffer) {
+        const ORACLE_ART: [&str; 6] = [
+            " ██████╗ ██████╗  █████╗  ██████╗██╗     ███████╗",
+            "██╔═══██╗██╔══██╗██╔══██╗██╔════╝██║     ██╔════╝",
+            "██║   ██║██████╔╝███████║██║     ██║     █████╗  ",
+            "██║   ██║██╔══██╗██╔══██║██║     ██║     ██╔══╝  ",
+            "╚██████╔╝██║  ██║██║  ██║╚██████╗███████╗███████╗",
+            " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝",
+        ];
+        let lines: Vec<Line> = ORACLE_ART
+            .iter()
+            .take(area.height as usize)
+            .map(|s| Line::from(Span::styled(*s, self.theme.style_accent())))
+            .collect();
+        Paragraph::new(lines).render(area, buf);
+    }
+
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
         let titles: Vec<&str> = Tab::all().iter().map(|t| t.title()).collect();
         let tab_bar = TabBar::new(titles, self.theme)
@@ -1333,12 +1351,19 @@ impl Widget for OracleUi<'_> {
             width: content_area.width.saturating_sub(2 * body_margin),
             height: content_area.height.saturating_sub(2 * body_margin),
         };
+        let header_height = 6u16;
         let chunks = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Min(12), Constraint::Length(status_height)])
+            .constraints([
+                Constraint::Length(header_height),
+                Constraint::Min(12),
+                Constraint::Length(status_height),
+            ])
             .split(padded);
 
-        let body = chunks[0];
+        self.render_header(chunks[0], buf);
+
+        let body = chunks[1];
         let left_div_right = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -1372,7 +1397,7 @@ impl Widget for OracleUi<'_> {
         self.render_tabs(tabs_rect, buf);
         self.render_inspector(inspector_rect, buf);
 
-        self.render_status(chunks[1], buf);
+        self.render_status(chunks[2], buf);
         self.render_completion(search_rect, buf);
         self.render_settings_overlay(area, buf);
         self.render_help_overlay(area, buf);
@@ -1382,6 +1407,7 @@ impl Widget for OracleUi<'_> {
 /// Returns the tabs bar Rect for a given full frame area (for mouse hit testing).
 pub fn tabs_rect_for_area(area: Rect) -> Option<Rect> {
     let status_height = 3u16;
+    let header_height = 6u16;
     let body_margin = 1u16;
     let content_area = Rect {
         x: area.x + 1,
@@ -1397,9 +1423,13 @@ pub fn tabs_rect_for_area(area: Rect) -> Option<Rect> {
     };
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(12), Constraint::Length(status_height)])
+        .constraints([
+            Constraint::Length(header_height),
+            Constraint::Min(12),
+            Constraint::Length(status_height),
+        ])
         .split(padded);
-    let body = chunks[0];
+    let body = chunks[1];
     let left_div_right = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([

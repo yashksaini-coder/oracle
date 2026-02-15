@@ -72,9 +72,9 @@ pub struct Theme {
     pub fg_muted: Color,
     pub border: Color,
     pub border_focused: Color,
-    /// Active tab background (e.g. lavender)
+    /// Active tab background (darker tone so white text is always visible)
     pub tab_active_bg: Color,
-    /// Active tab text (dark for contrast)
+    /// Active tab text (white for consistent contrast across themes)
     pub tab_active_fg: Color,
     pub error: Color,
     pub warning: Color,
@@ -103,8 +103,8 @@ impl Theme {
             fg_muted: Color::Rgb(140, 140, 145),
             border: Color::Rgb(60, 60, 60),
             border_focused: Color::Rgb(78, 191, 113),
-            tab_active_bg: Color::Rgb(180, 160, 220),  // Lavender
-            tab_active_fg: Color::Rgb(248, 248, 252),  // Light text on lavender (good contrast)
+            tab_active_bg: Color::Rgb(88, 66, 134),    // Darker purple: high contrast for white text
+            tab_active_fg: Color::Rgb(255, 255, 255),  // White: consistent across themes
             error: Color::Rgb(244, 67, 54),
             warning: Color::Rgb(255, 152, 0),
             success: Color::Rgb(76, 175, 80),
@@ -131,8 +131,8 @@ impl Theme {
             fg_muted: Color::Rgb(136, 142, 156),  // Nord3 brighter
             border: Color::Rgb(76, 86, 106),      // Nord3
             border_focused: Color::Rgb(136, 192, 208),
-            tab_active_bg: Color::Rgb(129, 161, 193),  // Nord9 blue
-            tab_active_fg: Color::Rgb(236, 239, 244),  // Nord6 light on blue
+            tab_active_bg: Color::Rgb(65, 89, 122),   // Darker Nord blue: high contrast for white text
+            tab_active_fg: Color::Rgb(255, 255, 255),  // White: consistent across themes
             error: Color::Rgb(191, 97, 106),     // Nord11
             warning: Color::Rgb(235, 203, 139),  // Nord13
             success: Color::Rgb(163, 190, 140),  // Nord14
@@ -160,8 +160,8 @@ impl Theme {
             fg_muted: Color::Rgb(147, 153, 178),   // Overlay0 brighter
             border: Color::Rgb(69, 71, 90),        // Surface1
             border_focused: Color::Rgb(166, 227, 161),
-            tab_active_bg: Color::Rgb(203, 166, 247),  // Mauve
-            tab_active_fg: Color::Rgb(205, 214, 244),  // Text light on mauve
+            tab_active_bg: Color::Rgb(126, 87, 194),   // Darker mauve: high contrast for white text
+            tab_active_fg: Color::Rgb(255, 255, 255),  // White: consistent across themes
             error: Color::Rgb(243, 139, 168),    // Red
             warning: Color::Rgb(249, 226, 175),  // Yellow
             success: Color::Rgb(166, 227, 161),  // Green
@@ -189,8 +189,8 @@ impl Theme {
             fg_muted: Color::Rgb(139, 153, 195),
             border: Color::Rgb(68, 71, 90),        // Current Line
             border_focused: Color::Rgb(80, 250, 123),
-            tab_active_bg: Color::Rgb(189, 147, 249),  // Purple
-            tab_active_fg: Color::Rgb(248, 248, 242),   // Foreground light on purple
+            tab_active_bg: Color::Rgb(118, 92, 168),   // Darker purple: high contrast for white text
+            tab_active_fg: Color::Rgb(255, 255, 255),   // White: consistent across themes
             error: Color::Rgb(255, 85, 85),     // Red
             warning: Color::Rgb(255, 184, 108), // Orange
             success: Color::Rgb(80, 250, 123),  // Green

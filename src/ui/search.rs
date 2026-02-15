@@ -118,7 +118,7 @@ impl Widget for SearchBar<'_> {
         let prompt = Span::styled("❯ ", self.theme.style_accent_bold());
 
         let (input_text, input_style) = if self.input.is_empty() {
-            (self.placeholder, self.theme.style_muted())
+            (self.placeholder, self.theme.style_dim())
         } else {
             (self.input, self.theme.style_normal())
         };
