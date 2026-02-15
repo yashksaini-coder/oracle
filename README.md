@@ -79,16 +79,31 @@ oracle
 
 | Key | Action |
 |-----|--------|
-| `Tab` / `Shift+Tab` | Switch between panels |
-| `↑/↓` or `j/k` | Navigate list / Scroll inspector |
-| `Enter` / `→` / `l` | View item details |
-| `←` / `h` | Back to list |
+| **Focus & panels** | |
+| `Tab` / `Shift+Tab` | Next / previous panel (search → list → inspector) |
 | `/` | Focus search |
-| `1-4` | Switch tabs (Types/Functions/Modules/Dependencies) |
-| `g` / `G` | Jump to first/last item |
-| `PgUp` / `PgDn` | Page navigation |
-| `?` | Show help |
+| `Esc` | Clear search, back to list, or close popup |
+| **List & inspector** | |
+| `↑` / `↓` or `j` / `k` | Move selection / scroll inspector |
+| `Enter` / `→` / `l` | Open item / focus inspector |
+| `←` / `h` | Back to list (e.g. exit crate view) |
+| `Home` | First item |
+| `G` / `End` | Last item |
+| `PgUp` / `PgDn` | Page up / down |
+| **Tabs** | |
+| `1` `2` `3` `4` | Types · Functions · Modules · Crates |
+| **Crates tab only** | |
+| `o` | Open docs.rs in browser |
+| `c` | Open crates.io in browser |
+| **Other** | |
+| `C` | Open Copilot chat (ask about current item) |
+| `t` | Cycle theme |
+| `S` | Settings overlay |
+| `?` | Toggle help |
 | `q` / `Esc` | Quit |
+| **Links** | |
+| `g` | Open GitHub repo in browser |
+| `s` | Open Sponsor page in browser |
 
 ## 🛠️ Development
 

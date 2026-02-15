@@ -100,11 +100,11 @@ impl<'a> OracleUi<'a> {
                 Span::raw("Back to list (e.g. exit crate view)"),
             ]),
             Line::from(vec![
-                Span::styled("  g  Home     ", self.theme.style_accent()),
+                Span::styled("  Home       ", self.theme.style_accent()),
                 Span::raw("First item"),
             ]),
             Line::from(vec![
-                Span::styled("  G  End      ", self.theme.style_accent()),
+                Span::styled("  G  End     ", self.theme.style_accent()),
                 Span::raw("Last item"),
             ]),
             Line::from(vec![
@@ -131,15 +131,7 @@ impl<'a> OracleUi<'a> {
             Line::from(Span::styled("Other", self.theme.style_dim())),
             Line::from(vec![
                 Span::styled("  C          ", self.theme.style_accent()),
-                Span::raw("Open Copilot chat (ask about current item in TUI)"),
-            ]),
-            Line::from(vec![
-                Span::styled("  q          ", self.theme.style_accent()),
-                Span::raw("Quit"),
-            ]),
-            Line::from(vec![
-                Span::styled("  ?          ", self.theme.style_accent()),
-                Span::raw("Toggle this help"),
+                Span::raw("Open Copilot chat (ask about current item)"),
             ]),
             Line::from(vec![
                 Span::styled("  t          ", self.theme.style_accent()),
@@ -148,6 +140,24 @@ impl<'a> OracleUi<'a> {
             Line::from(vec![
                 Span::styled("  S          ", self.theme.style_accent()),
                 Span::raw("Settings overlay"),
+            ]),
+            Line::from(vec![
+                Span::styled("  ?          ", self.theme.style_accent()),
+                Span::raw("Toggle this help"),
+            ]),
+            Line::from(vec![
+                Span::styled("  q  Esc     ", self.theme.style_accent()),
+                Span::raw("Quit"),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Links", self.theme.style_dim())),
+            Line::from(vec![
+                Span::styled("  g          ", self.theme.style_accent()),
+                Span::raw("Open GitHub repo in browser"),
+            ]),
+            Line::from(vec![
+                Span::styled("  s          ", self.theme.style_accent()),
+                Span::raw("Open Sponsor page in browser"),
             ]),
             Line::from(""),
             Line::from(Span::styled(
