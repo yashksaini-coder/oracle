@@ -7,10 +7,7 @@ use ratatui::{
     layout::Rect,
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{
-        block::BorderType,
-        Block, Borders, Paragraph, Widget,
-    },
+    widgets::{block::BorderType, Block, Borders, Paragraph, Widget},
 };
 
 use super::types::{Focus, Tab};

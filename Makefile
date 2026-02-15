@@ -1,6 +1,6 @@
 # Oracle - Rust Code Inspector - Extended Makefile
 
-.PHONY: all build release run clean test lint typecheck fmt fmt-fix check dev-setup install publish-dry-run publish help
+.PHONY: all build release run clean test lint lint-fix typecheck fmt fmt-fix check dev-setup install publish-dry-run publish help
 
 all: help
 
@@ -37,8 +37,12 @@ test:
 	cargo test
 
 lint:
-	@echo "🧹 Running linter (clippy)..."
+	@echo "🧹 Running linter (clippy, check only)..."
 	cargo clippy --all-targets --all-features -- -D warnings
+
+lint-fix:
+	@echo "🧹 Running linter (clippy, attempt to fix)..."
+	cargo clippy --all-targets --all-features --fix --allow-dirty -- -D warnings || echo "Some lints could not be fixed automatically. Please review manually."
 
 typecheck:
 	@echo "📝 Type checking..."
@@ -64,18 +68,19 @@ help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  build       Build debug version"
-	@echo "  release     Build optimized release"
-	@echo "  install     Install binary (cargo install --path .)"
+	@echo "  build        Build debug version"
+	@echo "  release      Build optimized release"
+	@echo "  install      Install binary (cargo install --path .)"
 	@echo "  publish-dry-run  Check crate for publish (no upload)"
-	@echo "  publish     Publish to crates.io (requires login)"
-	@echo "  run         Run Oracle"
-	@echo "  clean       Remove build artifacts"
-	@echo "  test        Run tests"
-	@echo "  lint        Lint with clippy"
-	@echo "  typecheck   Typecheck the code"
-	@echo "  fmt         Check code format"
-	@echo "  fmt-fix     Fix code format"
-	@echo "  check       Format + Lint + Typecheck + Test"
-	@echo "  dev-setup   Install required Rust components"
-	@echo "  help        Show this help message"
+	@echo "  publish      Publish to crates.io (requires login)"
+	@echo "  run          Run Oracle"
+	@echo "  clean        Remove build artifacts"
+	@echo "  test         Run tests"
+	@echo "  lint         Lint with clippy (does not fix)"
+	@echo "  lint-fix     Attempt to automatically fix lints (clippy --fix)"
+	@echo "  typecheck    Typecheck the code"
+	@echo "  fmt          Check code format"
+	@echo "  fmt-fix      Fix code format"
+	@echo "  check        Format + Lint + Typecheck + Test"
+	@echo "  dev-setup    Install required Rust components"
+	@echo "  help         Show this help message"

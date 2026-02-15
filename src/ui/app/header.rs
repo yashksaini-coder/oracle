@@ -35,10 +35,17 @@ impl<'a> OracleUi<'a> {
             },
         );
         let types_count = struct_count + enum_count + trait_count;
-        let line1 = format!("📦 {} types · {} fns · {} mods", types_count, fn_count, mod_count);
+        let line1 = format!(
+            "📦 {} types · {} fns · {} mods",
+            types_count, fn_count, mod_count
+        );
         let crates_count = self.dependency_tree.len();
         let line2 = if let Some(bytes) = self.target_size_bytes {
-            format!("📚 {} crates · target {}", crates_count, format_bytes(bytes))
+            format!(
+                "📚 {} crates · target {}",
+                crates_count,
+                format_bytes(bytes)
+            )
         } else {
             format!("📚 {} crates", crates_count)
         };

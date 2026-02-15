@@ -100,7 +100,11 @@ impl<'a> OracleUi<'a> {
             String::new()
         };
         let title = if self.search_input.is_empty() {
-            format!(" Items ({}){} ", self.filtered_items.len(), scroll_indicator)
+            format!(
+                " Items ({}){} ",
+                self.filtered_items.len(),
+                scroll_indicator
+            )
         } else {
             format!(
                 " Items ({}/{}){} ",
