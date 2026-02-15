@@ -12,7 +12,7 @@ use crate::ui::theme::Theme;
 
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{
@@ -311,63 +311,52 @@ impl<'a> OracleUi<'a> {
             .map(|c| format!("v{}", c.version))
             .unwrap_or_else(|| "v0.1.0".to_string());
 
-        if area.height < 5 {
-            let title = Line::from(vec![
-                Span::styled("🔮 ", Style::default()),
-                Span::styled("Oracle", self.theme.style_accent_bold()),
-                Span::styled(" │ ", self.theme.style_muted()),
-                Span::styled(crate_name, self.theme.style_normal()),
-                Span::styled(format!(" {}", version), self.theme.style_dim()),
-                Span::styled(" │ Rust Code Inspector", self.theme.style_muted()),
-            ]);
-            let header = Paragraph::new(title).block(
-                Block::default()
-                    .borders(Borders::BOTTOM)
-                    .border_style(self.theme.style_border()),
-            );
-            header.render(area, buf);
-            return;
-        }
-
-        let chunks = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Length(52), Constraint::Min(20)])
-            .split(area);
-
-        let banner_lines: Vec<Line> = banner
+        let mut lines: Vec<Line> = banner
             .iter()
             .map(|line| Line::from(Span::styled(*line, self.theme.style_accent())))
             .collect();
-        Paragraph::new(banner_lines).render(chunks[0], buf);
 
-        let info_lines = vec![
-            Line::from(""),
-            Line::from(vec![Span::styled(
-                " Rust Code Inspector",
-                self.theme.style_accent_bold(),
-            )]),
-            Line::from(vec![
-                Span::styled(" Project: ", self.theme.style_dim()),
+        if area.height >= 8 {
+            lines.push(Line::from(""));
+            lines.push(Line::from(vec![
+                Span::styled("Rust Code Inspector", self.theme.style_accent_bold()),
+                Span::styled("  ·  ", self.theme.style_muted()),
                 Span::styled(crate_name, self.theme.style_normal()),
-                Span::styled(format!(" ({})", version), self.theme.style_muted()),
-            ]),
-            Line::from(vec![
-                Span::styled(" Press ", self.theme.style_dim()),
+                Span::styled(format!(" {}", version), self.theme.style_dim()),
+            ]));
+            lines.push(Line::from(vec![
+                Span::styled("Press ", self.theme.style_dim()),
                 Span::styled("?", self.theme.style_accent()),
-                Span::styled(" help │ ", self.theme.style_dim()),
+                Span::styled(" help  ", self.theme.style_dim()),
                 Span::styled("q", self.theme.style_accent()),
-                Span::styled(" quit │ ", self.theme.style_dim()),
+                Span::styled(" quit  ", self.theme.style_dim()),
                 Span::styled("Tab", self.theme.style_accent()),
                 Span::styled(" switch", self.theme.style_dim()),
-            ]),
-        ];
-        Paragraph::new(info_lines).render(chunks[1], buf);
+            ]));
+        }
+
+        let block = Block::default()
+            .borders(Borders::BOTTOM)
+            .border_style(self.theme.style_border());
+        let inner = block.inner(area);
+        block.render(area, buf);
+        Paragraph::new(lines)
+            .alignment(Alignment::Center)
+            .render(inner, buf);
     }
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
+        let tab_width = 42;
+        let margin = area.width.saturating_sub(tab_width) / 2;
+        let tab_rect = Rect {
+            x: area.x + margin,
+            y: area.y,
+            width: tab_width.min(area.width),
+            height: area.height,
+        };
         let titles: Vec<&str> = Tab::all().iter().map(|t| t.title()).collect();
         let tab_bar = TabBar::new(titles, self.theme).select(self.current_tab.index());
-        tab_bar.render(area, buf);
+        tab_bar.render(tab_rect, buf);
     }
 
     fn render_search(&self, area: Rect, buf: &mut Buffer) {
@@ -1212,8 +1201,8 @@ impl<'a> OracleUi<'a> {
             return;
         }
 
-        let help_width = 55.min(area.width.saturating_sub(4));
-        let help_height = 24.min(area.height.saturating_sub(4));
+        let help_width = 62.min(area.width.saturating_sub(4));
+        let help_height = 30.min(area.height.saturating_sub(4));
         let help_area = Rect {
             x: area.x + (area.width - help_width) / 2,
             y: area.y + (area.height - help_height) / 2,
@@ -1229,48 +1218,64 @@ impl<'a> OracleUi<'a> {
                 self.theme.style_accent_bold(),
             )),
             Line::from(""),
-            Line::from(Span::styled("Navigation", self.theme.style_dim())),
+            Line::from(Span::styled("Focus & panels", self.theme.style_dim())),
             Line::from(vec![
                 Span::styled("  Tab        ", self.theme.style_accent()),
-                Span::raw("Next panel"),
+                Span::raw("Next panel (search → list → inspector)"),
             ]),
             Line::from(vec![
                 Span::styled("  Shift+Tab  ", self.theme.style_accent()),
                 Span::raw("Previous panel"),
             ]),
             Line::from(vec![
-                Span::styled("  ↑/↓  j/k   ", self.theme.style_accent()),
-                Span::raw("Navigate list / Scroll inspector"),
-            ]),
-            Line::from(vec![
-                Span::styled("  Enter/→/l  ", self.theme.style_accent()),
-                Span::raw("View item details"),
-            ]),
-            Line::from(vec![
-                Span::styled("  ←/h        ", self.theme.style_accent()),
-                Span::raw("Back to list"),
-            ]),
-            Line::from(vec![
-                Span::styled("  g/G        ", self.theme.style_accent()),
-                Span::raw("First/Last item"),
-            ]),
-            Line::from(vec![
-                Span::styled("  PgUp/PgDn  ", self.theme.style_accent()),
-                Span::raw("Page up/down"),
-            ]),
-            Line::from(""),
-            Line::from(Span::styled("Search & Tabs", self.theme.style_dim())),
-            Line::from(vec![
                 Span::styled("  /          ", self.theme.style_accent()),
                 Span::raw("Focus search"),
             ]),
             Line::from(vec![
-                Span::styled("  1-4        ", self.theme.style_accent()),
-                Span::raw("Switch to tab (Types/Fn/Mod/Crates)"),
+                Span::styled("  Esc        ", self.theme.style_accent()),
+                Span::raw("Clear search / Back / Close popup"),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("List & inspector", self.theme.style_dim())),
+            Line::from(vec![
+                Span::styled("  ↑/↓  j/k   ", self.theme.style_accent()),
+                Span::raw("Move selection / Scroll inspector"),
             ]),
             Line::from(vec![
-                Span::styled("  Esc        ", self.theme.style_accent()),
-                Span::raw("Clear search / Close popup / Exit"),
+                Span::styled("  Enter  →  l ", self.theme.style_accent()),
+                Span::raw("Open item / Focus inspector"),
+            ]),
+            Line::from(vec![
+                Span::styled("  ←  h       ", self.theme.style_accent()),
+                Span::raw("Back to list (e.g. exit crate view)"),
+            ]),
+            Line::from(vec![
+                Span::styled("  g  Home     ", self.theme.style_accent()),
+                Span::raw("First item"),
+            ]),
+            Line::from(vec![
+                Span::styled("  G  End      ", self.theme.style_accent()),
+                Span::raw("Last item"),
+            ]),
+            Line::from(vec![
+                Span::styled("  PgUp  PgDn  ", self.theme.style_accent()),
+                Span::raw("Page up / down"),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Tabs", self.theme.style_dim())),
+            Line::from(vec![
+                Span::styled("  1  2  3  4  ", self.theme.style_accent()),
+                Span::raw("Types · Functions · Modules · Crates"),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled("Crates tab only", self.theme.style_dim())),
+            Line::from(vec![
+                Span::styled("  [o]        ", self.theme.style_accent()),
+                Span::raw("Open docs.rs in browser"),
+            ]),
+            Line::from(vec![
+                Span::styled("  [c]        ", self.theme.style_accent()),
+                Span::raw("Open crates.io in browser"),
             ]),
             Line::from(""),
             Line::from(Span::styled("Other", self.theme.style_dim())),
@@ -1288,11 +1293,7 @@ impl<'a> OracleUi<'a> {
             ]),
             Line::from(vec![
                 Span::styled("  S          ", self.theme.style_accent()),
-                Span::raw("Settings (theme)"),
-            ]),
-            Line::from(vec![
-                Span::styled("  o / O      ", self.theme.style_accent()),
-                Span::raw("Open crate in browser (Crates): [o] docs.rs  [c] crates.io"),
+                Span::raw("Settings overlay"),
             ]),
             Line::from(""),
             Line::from(Span::styled(

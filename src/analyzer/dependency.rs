@@ -243,6 +243,8 @@ mod tests {
         let root = analyzer.root_package().unwrap();
         let deps = analyzer.direct_dependencies(&root.name);
         // Oracle has at least ratatui, crossterm, etc.
-        assert!(deps.iter().any(|d| d.name == "ratatui" || d.name == "crossterm"));
+        assert!(deps
+            .iter()
+            .any(|d| d.name == "ratatui" || d.name == "crossterm"));
     }
 }

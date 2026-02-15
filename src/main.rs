@@ -36,9 +36,6 @@ fn main() -> Result<()> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Splash screen with waves animation (skip with any key)
-    let _ = oracle_lib::ui::splash::run_splash(&mut terminal);
-
     // Create and run app
     let mut app = App::new();
 

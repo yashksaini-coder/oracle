@@ -799,10 +799,7 @@ mod tests {
     fn test_selected_dependency_name_returns_selected() {
         let mut app = App::new();
         app.current_tab = Tab::Crates;
-        app.dependency_tree = vec![
-            ("oracle".to_string(), 0),
-            ("serde".to_string(), 1),
-        ];
+        app.dependency_tree = vec![("oracle".to_string(), 0), ("serde".to_string(), 1)];
         app.filtered_dependency_indices = vec![0, 1];
         app.list_state.select(Some(1));
         assert_eq!(app.selected_dependency_name(), Some("serde".to_string()));
@@ -811,10 +808,7 @@ mod tests {
     #[test]
     fn test_dependency_root_name() {
         let mut app = App::new();
-        app.dependency_tree = vec![
-            ("oracle".to_string(), 0),
-            ("serde".to_string(), 1),
-        ];
+        app.dependency_tree = vec![("oracle".to_string(), 0), ("serde".to_string(), 1)];
         assert_eq!(app.dependency_root_name(), Some("oracle"));
         app.dependency_tree.clear();
         assert!(app.dependency_root_name().is_none());
@@ -852,10 +846,7 @@ mod tests {
     #[test]
     fn test_installed_crates_display_list_filters_by_project_deps() {
         let mut app = App::new();
-        app.dependency_tree = vec![
-            ("oracle".to_string(), 0),
-            ("serde".to_string(), 1),
-        ];
+        app.dependency_tree = vec![("oracle".to_string(), 0), ("serde".to_string(), 1)];
         app.installed_crates_list = vec!["serde".into(), "other".into()];
         let list = app.installed_crates_display_list();
         assert_eq!(list, vec!["serde"]);

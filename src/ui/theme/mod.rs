@@ -309,7 +309,10 @@ mod tests {
         assert_eq!(ThemeKind::from_name("default_dark"), ThemeKind::DefaultDark);
         assert_eq!(ThemeKind::from_name("nord"), ThemeKind::Nord);
         assert_eq!(ThemeKind::from_name("Nord"), ThemeKind::Nord);
-        assert_eq!(ThemeKind::from_name("catppuccin_mocha"), ThemeKind::CatppuccinMocha);
+        assert_eq!(
+            ThemeKind::from_name("catppuccin_mocha"),
+            ThemeKind::CatppuccinMocha
+        );
         assert_eq!(ThemeKind::from_name("mocha"), ThemeKind::CatppuccinMocha);
         assert_eq!(ThemeKind::from_name("dracula"), ThemeKind::Dracula);
         assert_eq!(ThemeKind::from_name("unknown"), ThemeKind::DefaultDark);
