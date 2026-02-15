@@ -42,7 +42,9 @@ impl ThemeKind {
         let s = s.trim();
         match s {
             "nord" => ThemeKind::Nord,
-            "catppuccin_mocha" | "catppuccin" | "mocha" | "catppuccin mocha" => ThemeKind::CatppuccinMocha,
+            "catppuccin_mocha" | "catppuccin" | "mocha" | "catppuccin mocha" => {
+                ThemeKind::CatppuccinMocha
+            }
             "dracula" => ThemeKind::Dracula,
             "default_dark" | "default" | "default dark" => ThemeKind::DefaultDark,
             _ => ThemeKind::DefaultDark,
@@ -87,7 +89,7 @@ impl Theme {
     pub fn default_dark() -> Self {
         Self {
             name: "Default Dark".into(),
-            accent: Color::Rgb(78, 191, 113),      // #4EBF71 - Green
+            accent: Color::Rgb(78, 191, 113), // #4EBF71 - Green
             accent_dim: Color::Rgb(45, 110, 65),
             bg: Color::Rgb(24, 24, 24),
             bg_highlight: Color::Rgb(45, 45, 45),
@@ -101,21 +103,21 @@ impl Theme {
             warning: Color::Rgb(255, 152, 0),
             success: Color::Rgb(76, 175, 80),
             info: Color::Rgb(33, 150, 243),
-            keyword: Color::Rgb(198, 120, 221),    // Purple
-            function: Color::Rgb(97, 175, 239),    // Blue
-            type_: Color::Rgb(229, 192, 123),      // Yellow
-            string: Color::Rgb(152, 195, 121),     // Green
-            number: Color::Rgb(209, 154, 102),     // Orange
-            comment: Color::Rgb(92, 99, 112),      // Gray
+            keyword: Color::Rgb(198, 120, 221), // Purple
+            function: Color::Rgb(97, 175, 239), // Blue
+            type_: Color::Rgb(229, 192, 123),   // Yellow
+            string: Color::Rgb(152, 195, 121),  // Green
+            number: Color::Rgb(209, 154, 102),  // Orange
+            comment: Color::Rgb(92, 99, 112),   // Gray
         }
     }
 
     pub fn nord() -> Self {
         Self {
             name: "Nord".into(),
-            accent: Color::Rgb(136, 192, 208),     // Nord8
-            accent_dim: Color::Rgb(94, 129, 172),  // Nord10
-            bg: Color::Rgb(46, 52, 64),            // Nord0
+            accent: Color::Rgb(136, 192, 208),    // Nord8
+            accent_dim: Color::Rgb(94, 129, 172), // Nord10
+            bg: Color::Rgb(46, 52, 64),           // Nord0
             bg_highlight: Color::Rgb(59, 66, 82), // Nord1
             bg_panel: Color::Rgb(67, 76, 94),     // Nord2
             fg: Color::Rgb(236, 239, 244),        // Nord6
@@ -123,16 +125,16 @@ impl Theme {
             fg_muted: Color::Rgb(76, 86, 106),    // Nord3
             border: Color::Rgb(76, 86, 106),      // Nord3
             border_focused: Color::Rgb(136, 192, 208),
-            error: Color::Rgb(191, 97, 106),      // Nord11
-            warning: Color::Rgb(235, 203, 139),   // Nord13
-            success: Color::Rgb(163, 190, 140),   // Nord14
-            info: Color::Rgb(129, 161, 193),      // Nord9
-            keyword: Color::Rgb(180, 142, 173),   // Nord15
-            function: Color::Rgb(136, 192, 208),  // Nord8
-            type_: Color::Rgb(235, 203, 139),     // Nord13
-            string: Color::Rgb(163, 190, 140),    // Nord14
-            number: Color::Rgb(208, 135, 112),    // Nord12
-            comment: Color::Rgb(76, 86, 106),     // Nord3
+            error: Color::Rgb(191, 97, 106),     // Nord11
+            warning: Color::Rgb(235, 203, 139),  // Nord13
+            success: Color::Rgb(163, 190, 140),  // Nord14
+            info: Color::Rgb(129, 161, 193),     // Nord9
+            keyword: Color::Rgb(180, 142, 173),  // Nord15
+            function: Color::Rgb(136, 192, 208), // Nord8
+            type_: Color::Rgb(235, 203, 139),    // Nord13
+            string: Color::Rgb(163, 190, 140),   // Nord14
+            number: Color::Rgb(208, 135, 112),   // Nord12
+            comment: Color::Rgb(76, 86, 106),    // Nord3
         }
     }
 
@@ -150,16 +152,16 @@ impl Theme {
             fg_muted: Color::Rgb(108, 112, 134),   // Overlay0
             border: Color::Rgb(69, 71, 90),        // Surface1
             border_focused: Color::Rgb(166, 227, 161),
-            error: Color::Rgb(243, 139, 168),      // Red
-            warning: Color::Rgb(249, 226, 175),    // Yellow
-            success: Color::Rgb(166, 227, 161),    // Green
-            info: Color::Rgb(137, 180, 250),       // Blue
-            keyword: Color::Rgb(203, 166, 247),    // Mauve
-            function: Color::Rgb(137, 180, 250),   // Blue
-            type_: Color::Rgb(249, 226, 175),      // Yellow
-            string: Color::Rgb(166, 227, 161),     // Green
-            number: Color::Rgb(250, 179, 135),     // Peach
-            comment: Color::Rgb(108, 112, 134),    // Overlay0
+            error: Color::Rgb(243, 139, 168),    // Red
+            warning: Color::Rgb(249, 226, 175),  // Yellow
+            success: Color::Rgb(166, 227, 161),  // Green
+            info: Color::Rgb(137, 180, 250),     // Blue
+            keyword: Color::Rgb(203, 166, 247),  // Mauve
+            function: Color::Rgb(137, 180, 250), // Blue
+            type_: Color::Rgb(249, 226, 175),    // Yellow
+            string: Color::Rgb(166, 227, 161),   // Green
+            number: Color::Rgb(250, 179, 135),   // Peach
+            comment: Color::Rgb(108, 112, 134),  // Overlay0
         }
     }
 
@@ -177,16 +179,16 @@ impl Theme {
             fg_muted: Color::Rgb(98, 114, 164),    // Comment
             border: Color::Rgb(68, 71, 90),        // Current Line
             border_focused: Color::Rgb(80, 250, 123),
-            error: Color::Rgb(255, 85, 85),        // Red
-            warning: Color::Rgb(255, 184, 108),    // Orange
-            success: Color::Rgb(80, 250, 123),     // Green
-            info: Color::Rgb(139, 233, 253),       // Cyan
-            keyword: Color::Rgb(255, 121, 198),    // Pink
-            function: Color::Rgb(80, 250, 123),    // Green
-            type_: Color::Rgb(139, 233, 253),      // Cyan
-            string: Color::Rgb(241, 250, 140),     // Yellow
-            number: Color::Rgb(189, 147, 249),     // Purple
-            comment: Color::Rgb(98, 114, 164),     // Comment
+            error: Color::Rgb(255, 85, 85),     // Red
+            warning: Color::Rgb(255, 184, 108), // Orange
+            success: Color::Rgb(80, 250, 123),  // Green
+            info: Color::Rgb(139, 233, 253),    // Cyan
+            keyword: Color::Rgb(255, 121, 198), // Pink
+            function: Color::Rgb(80, 250, 123), // Green
+            type_: Color::Rgb(139, 233, 253),   // Cyan
+            string: Color::Rgb(241, 250, 140),  // Yellow
+            number: Color::Rgb(189, 147, 249),  // Purple
+            comment: Color::Rgb(98, 114, 164),  // Comment
         }
     }
 
@@ -213,7 +215,9 @@ impl Theme {
     }
 
     pub fn style_accent_bold(&self) -> Style {
-        Style::default().fg(self.accent).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.accent)
+            .add_modifier(Modifier::BOLD)
     }
 
     pub fn style_normal(&self) -> Style {
@@ -292,5 +296,42 @@ impl Theme {
 impl Default for Theme {
     fn default() -> Self {
         Self::default_dark()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_theme_kind_from_name() {
+        assert_eq!(ThemeKind::from_name("default"), ThemeKind::DefaultDark);
+        assert_eq!(ThemeKind::from_name("default_dark"), ThemeKind::DefaultDark);
+        assert_eq!(ThemeKind::from_name("nord"), ThemeKind::Nord);
+        assert_eq!(ThemeKind::from_name("Nord"), ThemeKind::Nord);
+        assert_eq!(ThemeKind::from_name("catppuccin_mocha"), ThemeKind::CatppuccinMocha);
+        assert_eq!(ThemeKind::from_name("mocha"), ThemeKind::CatppuccinMocha);
+        assert_eq!(ThemeKind::from_name("dracula"), ThemeKind::Dracula);
+        assert_eq!(ThemeKind::from_name("unknown"), ThemeKind::DefaultDark);
+    }
+
+    #[test]
+    fn test_theme_kind_next_cycles() {
+        let first = ThemeKind::DefaultDark;
+        let second = first.next();
+        assert_ne!(first, second);
+        let mut k = ThemeKind::DefaultDark;
+        for _ in 0..ThemeKind::ALL.len() {
+            k = k.next();
+        }
+        assert_eq!(k, ThemeKind::DefaultDark);
+    }
+
+    #[test]
+    fn test_theme_from_kind() {
+        let t = Theme::from_kind(ThemeKind::Nord);
+        assert_eq!(t.name, "Nord");
+        let t2 = Theme::from_name("dracula");
+        assert_eq!(t2.name, "Dracula");
     }
 }

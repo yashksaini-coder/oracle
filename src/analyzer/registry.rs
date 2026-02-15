@@ -8,6 +8,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Parsed Cargo.toml package metadata: description, authors, license, repository, documentation, keywords, categories
+type CargoTomlMeta = (
+    Option<String>,
+    Vec<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Vec<String>,
+    Vec<String>,
+);
+
 /// Information about an installed crate
 #[derive(Debug, Clone)]
 pub struct InstalledCrate {
@@ -35,7 +46,7 @@ impl CrateRegistry {
     pub fn new() -> Self {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
         let registry_path = PathBuf::from(home).join(".cargo/registry/src");
-        
+
         Self {
             crates: HashMap::new(),
             registry_path,
@@ -62,7 +73,7 @@ impl CrateRegistry {
         for index_entry in fs::read_dir(&self.registry_path)? {
             let index_entry = index_entry?;
             let index_path = index_entry.path();
-            
+
             if index_path.is_dir() {
                 self.scan_index_directory(&index_path)?;
             }
@@ -75,7 +86,7 @@ impl CrateRegistry {
         for entry in fs::read_dir(index_path)? {
             let entry = entry?;
             let crate_path = entry.path();
-            
+
             if crate_path.is_dir() {
                 if let Some(crate_info) = self.parse_crate_directory(&crate_path) {
                     self.crates
@@ -91,13 +102,13 @@ impl CrateRegistry {
 
     fn parse_crate_directory(&self, path: &Path) -> Option<InstalledCrate> {
         let dir_name = path.file_name()?.to_str()?;
-        
+
         // Parse name and version from directory name (e.g., "serde-1.0.193")
         let (name, version) = Self::parse_crate_name_version(dir_name)?;
-        
+
         // Try to read Cargo.toml for metadata
         let cargo_toml_path = path.join("Cargo.toml");
-        let (description, authors, license, repository, documentation, keywords, categories) = 
+        let (description, authors, license, repository, documentation, keywords, categories) =
             if cargo_toml_path.exists() {
                 Self::parse_cargo_toml(&cargo_toml_path)
             } else {
@@ -126,12 +137,17 @@ impl CrateRegistry {
         // Find the last hyphen followed by a version number
         let mut last_version_start = None;
         let chars: Vec<char> = dir_name.chars().collect();
-        
+
         for i in (0..chars.len()).rev() {
             if chars[i] == '-' && i + 1 < chars.len() {
                 // Check if what follows looks like a version
                 let rest = &dir_name[i + 1..];
-                if rest.chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false) {
+                if rest
+                    .chars()
+                    .next()
+                    .map(|c| c.is_ascii_digit())
+                    .unwrap_or(false)
+                {
                     last_version_start = Some(i);
                     break;
                 }
@@ -141,11 +157,11 @@ impl CrateRegistry {
         let i = last_version_start?;
         let name = dir_name[..i].to_string();
         let version = dir_name[i + 1..].to_string();
-        
+
         Some((name, version))
     }
 
-    fn parse_cargo_toml(path: &Path) -> (Option<String>, Vec<String>, Option<String>, Option<String>, Option<String>, Vec<String>, Vec<String>) {
+    fn parse_cargo_toml(path: &Path) -> CargoTomlMeta {
         let content = match fs::read_to_string(path) {
             Ok(c) => c,
             Err(_) => return (None, vec![], None, None, None, vec![], vec![]),
@@ -157,7 +173,7 @@ impl CrateRegistry {
         };
 
         let package = toml.get("package");
-        
+
         let description = package
             .and_then(|p| p.get("description"))
             .and_then(|d| d.as_str())
@@ -211,12 +227,26 @@ impl CrateRegistry {
             })
             .unwrap_or_default();
 
-        (description, authors, license, repository, documentation, keywords, categories)
+        (
+            description,
+            authors,
+            license,
+            repository,
+            documentation,
+            keywords,
+            categories,
+        )
     }
 
     fn find_and_read_readme(path: &Path) -> Option<String> {
-        let readme_names = ["README.md", "README", "Readme.md", "readme.md", "README.txt"];
-        
+        let readme_names = [
+            "README.md",
+            "README",
+            "Readme.md",
+            "readme.md",
+            "README.txt",
+        ];
+
         for name in &readme_names {
             let readme_path = path.join(name);
             if readme_path.exists() {
@@ -296,11 +326,11 @@ impl CrateRegistry {
 
         let analyzer = RustAnalyzer::new();
         let src_path = crate_info.path.join("src");
-        
+
         let mut items = Vec::new();
         // Use crate name (with underscores instead of hyphens) as base module path
         let crate_module_name = name.replace('-', "_");
-        
+
         if src_path.exists() {
             Self::analyze_directory(&analyzer, &src_path, &mut items, &crate_module_name)?;
         }
@@ -308,7 +338,12 @@ impl CrateRegistry {
         Ok(items)
     }
 
-    fn analyze_directory(analyzer: &RustAnalyzer, dir: &Path, items: &mut Vec<AnalyzedItem>, crate_name: &str) -> Result<()> {
+    fn analyze_directory(
+        analyzer: &RustAnalyzer,
+        dir: &Path,
+        items: &mut Vec<AnalyzedItem>,
+        crate_name: &str,
+    ) -> Result<()> {
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
@@ -331,14 +366,14 @@ impl CrateRegistry {
     /// Returns clean path like ["serde", "de", "value"] not registry paths
     fn build_module_path(file_path: &Path, crate_name: &str) -> Vec<String> {
         let mut result = vec![crate_name.to_string()];
-        
-        // Convert to string and find src/ 
+
+        // Convert to string and find src/
         let path_str = file_path.to_string_lossy();
-        
+
         // Find the last "src/" in the path
         if let Some(src_idx) = path_str.rfind("/src/") {
             let after_src = &path_str[src_idx + 5..]; // Skip "/src/"
-            
+
             for part in after_src.split('/') {
                 if part.ends_with(".rs") {
                     let module = part.trim_end_matches(".rs");
@@ -351,14 +386,14 @@ impl CrateRegistry {
                 }
             }
         }
-        
+
         result
     }
 
     /// Search for crates by name
     pub fn search(&self, query: &str) -> Vec<&InstalledCrate> {
         let query_lower = query.to_lowercase();
-        
+
         self.crates
             .values()
             .flatten()
@@ -380,14 +415,31 @@ mod tests {
     #[test]
     fn test_parse_crate_name_version() {
         let cases = vec![
-            ("serde-1.0.193", Some(("serde".to_string(), "1.0.193".to_string()))),
-            ("serde_json-1.0.108", Some(("serde_json".to_string(), "1.0.108".to_string()))),
-            ("tokio-1.35.0", Some(("tokio".to_string(), "1.35.0".to_string()))),
-            ("my-crate-name-0.1.0", Some(("my-crate-name".to_string(), "0.1.0".to_string()))),
+            (
+                "serde-1.0.193",
+                Some(("serde".to_string(), "1.0.193".to_string())),
+            ),
+            (
+                "serde_json-1.0.108",
+                Some(("serde_json".to_string(), "1.0.108".to_string())),
+            ),
+            (
+                "tokio-1.35.0",
+                Some(("tokio".to_string(), "1.35.0".to_string())),
+            ),
+            (
+                "my-crate-name-0.1.0",
+                Some(("my-crate-name".to_string(), "0.1.0".to_string())),
+            ),
         ];
 
         for (input, expected) in cases {
-            assert_eq!(CrateRegistry::parse_crate_name_version(input), expected, "Failed for: {}", input);
+            assert_eq!(
+                CrateRegistry::parse_crate_name_version(input),
+                expected,
+                "Failed for: {}",
+                input
+            );
         }
     }
 }

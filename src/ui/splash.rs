@@ -74,7 +74,10 @@ pub fn run_splash(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> anyh
             let title = Paragraph::new(vec![
                 Line::from(""),
                 Line::from(vec![
-                    Span::styled("ORACLE", theme.style_accent_bold().add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        "ORACLE",
+                        theme.style_accent_bold().add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled("  ·  ", theme.style_muted()),
                     Span::styled("Rust Code Inspector", theme.style_dim()),
                 ]),

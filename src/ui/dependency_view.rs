@@ -6,8 +6,8 @@ use ratatui::{
     style::Modifier,
     text::{Line, Span},
     widgets::{
-        block::BorderType,
-        Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap,
+        block::BorderType, Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, StatefulWidget, Widget, Wrap,
     },
 };
 
@@ -113,19 +113,21 @@ impl<'a> DependencyView<'a> {
         lines.push(Line::from(vec![
             Span::styled(
                 info.name.clone(),
-                self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED),
+                self.theme
+                    .style_accent_bold()
+                    .add_modifier(Modifier::UNDERLINED),
             ),
             Span::raw(" "),
-            Span::styled(
-                format!("v{}", info.version),
-                self.theme.style_dim(),
-            ),
+            Span::styled(format!("v{}", info.version), self.theme.style_dim()),
         ]));
         lines.push(Line::from(""));
 
         // Description
         if let Some(ref desc) = info.description {
-            lines.push(Line::from(Span::styled(desc.clone(), self.theme.style_normal())));
+            lines.push(Line::from(Span::styled(
+                desc.clone(),
+                self.theme.style_normal(),
+            )));
             lines.push(Line::from(""));
         }
 
@@ -199,11 +201,26 @@ impl<'a> DependencyView<'a> {
 
         // Dependencies summary
         lines.push(Line::from(""));
-        let normal_deps = info.dependencies.iter().filter(|d| d.kind == DependencyKind::Normal).count();
-        let dev_deps = info.dependencies.iter().filter(|d| d.kind == DependencyKind::Dev).count();
-        let build_deps = info.dependencies.iter().filter(|d| d.kind == DependencyKind::Build).count();
+        let normal_deps = info
+            .dependencies
+            .iter()
+            .filter(|d| d.kind == DependencyKind::Normal)
+            .count();
+        let dev_deps = info
+            .dependencies
+            .iter()
+            .filter(|d| d.kind == DependencyKind::Dev)
+            .count();
+        let build_deps = info
+            .dependencies
+            .iter()
+            .filter(|d| d.kind == DependencyKind::Build)
+            .count();
 
-        lines.push(Line::from(Span::styled("Dependencies:", self.theme.style_dim())));
+        lines.push(Line::from(Span::styled(
+            "Dependencies:",
+            self.theme.style_dim(),
+        )));
         lines.push(Line::from(vec![
             Span::raw("  "),
             Span::styled(format!("{}", normal_deps), self.theme.style_accent()),
@@ -216,7 +233,12 @@ impl<'a> DependencyView<'a> {
 
         // List direct dependencies
         lines.push(Line::from(""));
-        for dep in info.dependencies.iter().filter(|d| d.kind == DependencyKind::Normal).take(15) {
+        for dep in info
+            .dependencies
+            .iter()
+            .filter(|d| d.kind == DependencyKind::Normal)
+            .take(15)
+        {
             let optional = if dep.optional { " (optional)" } else { "" };
             lines.push(Line::from(vec![
                 Span::raw("  "),
@@ -272,7 +294,11 @@ impl<'a> DependencyView<'a> {
                 Span::styled("crates.io", self.theme.style_dim()),
             ]);
             Paragraph::new(hint_line).render(
-                Rect { y: hint_y, height: 1, ..inner },
+                Rect {
+                    y: hint_y,
+                    height: 1,
+                    ..inner
+                },
                 buf,
             );
         }
@@ -326,7 +352,10 @@ impl<'a> DependencyDocView<'a> {
     fn section_title(&self, title: &str) -> Line<'static> {
         Line::from(vec![
             Span::styled("▸ ", self.theme.style_accent()),
-            Span::styled(title.to_string(), self.theme.style_accent().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                title.to_string(),
+                self.theme.style_accent().add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" ─────────────", self.theme.style_muted()),
         ])
     }
@@ -336,22 +365,28 @@ impl<'a> DependencyDocView<'a> {
         lines.push(Line::from(vec![
             Span::styled(
                 self.doc.name.clone(),
-                self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED),
+                self.theme
+                    .style_accent_bold()
+                    .add_modifier(Modifier::UNDERLINED),
             ),
             Span::raw(" "),
-            Span::styled(
-                format!("v{}", self.doc.version),
-                self.theme.style_dim(),
-            ),
+            Span::styled(format!("v{}", self.doc.version), self.theme.style_dim()),
         ]));
         lines.push(Line::from(""));
 
         if let Some(ref d) = self.doc.description {
             lines.push(self.section_title("Description"));
             lines.push(Line::from(""));
-            let desc = if d.len() > 600 { format!("{}…", &d[..600]) } else { d.clone() };
+            let desc = if d.len() > 600 {
+                format!("{}…", &d[..600])
+            } else {
+                d.clone()
+            };
             for line in desc.lines() {
-                lines.push(Line::from(Span::styled(line.to_string(), self.theme.style_normal())));
+                lines.push(Line::from(Span::styled(
+                    line.to_string(),
+                    self.theme.style_normal(),
+                )));
             }
             lines.push(Line::from(""));
         }
@@ -411,11 +446,12 @@ impl<'a> DependencyDocView<'a> {
                 ]));
             }
             if let Some(ref updated) = g.updated_at {
-                let short = if updated.len() >= 10 && updated.as_bytes().get(10).copied() == Some(b'T') {
-                    format!("{}", &updated[..10])
-                } else {
-                    updated.clone()
-                };
+                let short =
+                    if updated.len() >= 10 && updated.as_bytes().get(10).copied() == Some(b'T') {
+                        updated[..10].to_string()
+                    } else {
+                        updated.clone()
+                    };
                 lines.push(Line::from(vec![
                     Span::styled("  Updated:", self.theme.style_dim()),
                     Span::styled(format!(" {}", short), self.theme.style_muted()),
@@ -490,7 +526,11 @@ impl Widget for DependencyDocView<'_> {
                 Span::styled("crates.io", self.theme.style_dim()),
             ]);
             Paragraph::new(hint_line).render(
-                Rect { y: hint_y, height: 1, ..inner },
+                Rect {
+                    y: hint_y,
+                    height: 1,
+                    ..inner
+                },
                 buf,
             );
         }
@@ -523,7 +563,14 @@ pub fn render_doc_loading(theme: &Theme, area: Rect, buf: &mut Buffer, crate_nam
             Span::styled(" [c] ", theme.style_accent()),
             Span::styled("crates.io", theme.style_dim()),
         ]);
-        Paragraph::new(hint_line).render(Rect { y: hint_y, height: 1, ..inner }, buf);
+        Paragraph::new(hint_line).render(
+            Rect {
+                y: hint_y,
+                height: 1,
+                ..inner
+            },
+            buf,
+        );
     }
 }
 
@@ -557,6 +604,13 @@ pub fn render_doc_failed(theme: &Theme, area: Rect, buf: &mut Buffer, crate_name
             Span::styled(" [c] ", theme.style_accent()),
             Span::styled("crates.io", theme.style_dim()),
         ]);
-        Paragraph::new(hint_line).render(Rect { y: hint_y, height: 1, ..inner }, buf);
+        Paragraph::new(hint_line).render(
+            Rect {
+                y: hint_y,
+                height: 1,
+                ..inner
+            },
+            buf,
+        );
     }
 }

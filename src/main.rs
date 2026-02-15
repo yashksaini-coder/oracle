@@ -4,7 +4,9 @@
 
 use anyhow::Result;
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -44,7 +46,7 @@ fn main() -> Result<()> {
     let _ = app.load_settings();
 
     // Analyze the project
-    if let Err(e) = app.analyze_project(&project_path) {
+    if let Err(e) = app.analyze_project(project_path.as_path()) {
         app.status_message = format!("Analysis failed: {}", e);
     }
 
@@ -70,11 +72,11 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
     let mut animation = AnimationState::new();
     let mut inspector_scroll: usize = 0;
     let mut last_selected: Option<usize> = None;
-    
+
     loop {
         // Update animations
         animation.update();
-        
+
         // Reset inspector scroll on selection change
         let current_selected = app.list_state.selected();
         if current_selected != last_selected {
@@ -89,24 +91,29 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
 
         // Draw UI
         let selected_dep_name = app.selected_dependency_name();
-        let crate_doc = selected_dep_name.as_ref().and_then(|n| app.crate_docs_cache.get(n));
+        let crate_doc = selected_dep_name
+            .as_ref()
+            .and_then(|n| app.crate_docs_cache.get(n));
         let crate_doc_loading = app.crate_docs_loading.as_deref() == selected_dep_name.as_deref();
-        let crate_doc_failed = selected_dep_name.as_ref().map_or(false, |n| app.crate_docs_failed.contains(n));
+        let crate_doc_failed = selected_dep_name
+            .as_ref()
+            .is_some_and(|n| app.crate_docs_failed.contains(n));
         terminal.draw(|frame| {
             let filtered = app.get_filtered_items();
             let selected = app.list_state.selected();
 
-            let installed_items: Vec<&oracle_lib::analyzer::AnalyzedItem> =
-                app.installed_crate_filtered
-                    .iter()
-                    .filter_map(|&i| app.installed_crate_items.get(i))
-                    .collect();
+            let installed_items: Vec<&oracle_lib::analyzer::AnalyzedItem> = app
+                .installed_crate_filtered
+                .iter()
+                .filter_map(|&i| app.installed_crate_items.get(i))
+                .collect();
 
-            let all_items_impl = if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
-                Some(app.installed_crate_items.as_slice())
-            } else {
-                Some(app.items.as_slice())
-            };
+            let all_items_impl =
+                if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
+                    Some(app.installed_crate_items.as_slice())
+                } else {
+                    Some(app.items.as_slice())
+                };
             let ui = OracleUi::new(&app.theme)
                 .items(&app.items)
                 .all_items_impl_lookup(all_items_impl)
@@ -150,7 +157,13 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
         if event::poll(poll_duration)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    handle_key_event(app, key.code, key.modifiers, &mut inspector_scroll, &mut animation);
+                    handle_key_event(
+                        app,
+                        key.code,
+                        key.modifiers,
+                        &mut inspector_scroll,
+                        &mut animation,
+                    );
                 }
             }
         }
@@ -182,7 +195,9 @@ fn handle_key_event(
             app.cycle_theme();
             return;
         }
-        KeyCode::Char('S') if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search => {
+        KeyCode::Char('S')
+            if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search =>
+        {
             app.toggle_settings();
             return;
         }
@@ -311,7 +326,7 @@ fn handle_search_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
 
 fn handle_list_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
     use oracle_lib::ui::app::Tab;
-    
+
     match code {
         KeyCode::Down | KeyCode::Char('j') => {
             app.next_item();
@@ -332,7 +347,7 @@ fn handle_list_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             // Dependencies: Enter on a dep opens that crate's items (from registry)
             if app.current_tab == Tab::Crates && app.selected_installed_crate.is_none() {
                 if let Some(name) = app.selected_dependency_name() {
-                    if app.dependency_root_name().as_deref() != Some(name.as_str()) {
+                    if app.dependency_root_name() != Some(name.as_str()) {
                         let _ = app.select_installed_crate(&name);
                         app.list_state.select(Some(0));
                     } else {

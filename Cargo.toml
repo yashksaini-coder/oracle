@@ -5,9 +5,12 @@ edition = "2021"
 rust-version = "1.75"
 description = "Blazing-fast Rust Code Inspector for the Terminal"
 license = "MIT"
+authors = ["yashksaini-coder <yashksaini89@gmail.com>"]
 keywords = ["tui", "inspector", "rust", "analyzer", "developer-tools"]
 categories = ["command-line-utilities", "development-tools"]
-repository = "https://github.com/user/oracle"
+repository = "https://github.com/yashksaini-coder/oracle"
+homepage = "https://github.com/yashksaini-coder/oracle"
+documentation = "https://docs.rs/oracle"
 readme = "README.md"
 
 [[bin]]

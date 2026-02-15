@@ -38,7 +38,9 @@ const USER_AGENT: &str = "Oracle/0.1 (Rust code inspector; https://github.com/us
 /// Parse "https://github.com/owner/repo" or "https://github.com/owner/repo/" into Some(("owner", "repo")).
 fn parse_github_url(repo: &str) -> Option<(String, String)> {
     let s = repo.trim().trim_end_matches('/');
-    let rest = s.strip_prefix("https://github.com/").or_else(|| s.strip_prefix("http://github.com/"))?;
+    let rest = s
+        .strip_prefix("https://github.com/")
+        .or_else(|| s.strip_prefix("http://github.com/"))?;
     let mut parts = rest.splitn(2, '/');
     let owner = parts.next()?.to_string();
     let repo_name = parts.next()?.split('/').next()?.to_string();
@@ -57,7 +59,9 @@ fn fetch_github_repo_info(owner: &str, repo: &str) -> Option<GitHubRepoInfo> {
         .user_agent(USER_AGENT)
         .build()
         .ok()?;
-    let mut req = client.get(&url).header("Accept", "application/vnd.github.v3+json");
+    let mut req = client
+        .get(&url)
+        .header("Accept", "application/vnd.github.v3+json");
     if let Ok(token) = std::env::var("GITHUB_TOKEN") {
         if !token.is_empty() {
             req = req.header("Authorization", format!("Bearer {}", token));
@@ -72,12 +76,30 @@ fn fetch_github_repo_info(owner: &str, repo: &str) -> Option<GitHubRepoInfo> {
         return None;
     }
     let body: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    let stars = body.get("stargazers_count").and_then(|v| v.as_u64()).map(|n| n as u32);
-    let forks = body.get("forks_count").and_then(|v| v.as_u64()).map(|n| n as u32);
-    let language = body.get("language").and_then(|v| v.as_str()).map(String::from);
-    let updated_at = body.get("updated_at").and_then(|v| v.as_str()).map(String::from);
-    let open_issues_count = body.get("open_issues_count").and_then(|v| v.as_u64()).map(|n| n as u32);
-    let default_branch = body.get("default_branch").and_then(|v| v.as_str()).map(String::from);
+    let stars = body
+        .get("stargazers_count")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32);
+    let forks = body
+        .get("forks_count")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32);
+    let language = body
+        .get("language")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let updated_at = body
+        .get("updated_at")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let open_issues_count = body
+        .get("open_issues_count")
+        .and_then(|v| v.as_u64())
+        .map(|n| n as u32);
+    let default_branch = body
+        .get("default_branch")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     Some(GitHubRepoInfo {
         stars,
         forks,
@@ -114,10 +136,22 @@ pub fn fetch_crate_docs(crate_name: &str) -> Option<CrateDocInfo> {
     let body: serde_json::Value = response.json().ok()?;
     let crate_obj = body.get("crate")?;
     let name = crate_obj.get("name")?.as_str()?.to_string();
-    let description = crate_obj.get("description").and_then(|v| v.as_str()).map(String::from);
-    let documentation = crate_obj.get("documentation").and_then(|v| v.as_str()).map(String::from);
-    let homepage = crate_obj.get("homepage").and_then(|v| v.as_str()).map(String::from);
-    let repository = crate_obj.get("repository").and_then(|v| v.as_str()).map(String::from);
+    let description = crate_obj
+        .get("description")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let documentation = crate_obj
+        .get("documentation")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let homepage = crate_obj
+        .get("homepage")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let repository = crate_obj
+        .get("repository")
+        .and_then(|v| v.as_str())
+        .map(String::from);
     let version = crate_obj
         .get("newest_version")
         .or_else(|| crate_obj.get("max_version"))
@@ -139,4 +173,28 @@ pub fn fetch_crate_docs(crate_name: &str) -> Option<CrateDocInfo> {
         repository,
         github,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_github_url() {
+        assert_eq!(
+            parse_github_url("https://github.com/rust-lang/rust"),
+            Some(("rust-lang".into(), "rust".into()))
+        );
+        assert_eq!(
+            parse_github_url("https://github.com/owner/repo/"),
+            Some(("owner".into(), "repo".into()))
+        );
+        assert_eq!(
+            parse_github_url("http://github.com/a/b"),
+            Some(("a".into(), "b".into()))
+        );
+        assert!(parse_github_url("https://gitlab.com/owner/repo").is_none());
+        assert!(parse_github_url("https://github.com/").is_none());
+        assert!(parse_github_url("").is_none());
+    }
 }

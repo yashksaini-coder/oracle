@@ -1,15 +1,17 @@
 //! Application state management
 
-use crate::analyzer::{CrateInfo, CrateRegistry, DependencyAnalyzer, AnalyzedItem, InstalledCrate, RustAnalyzer};
+use crate::analyzer::{
+    AnalyzedItem, CrateInfo, CrateRegistry, DependencyAnalyzer, InstalledCrate, RustAnalyzer,
+};
 use crate::config::Settings;
 use crate::crates_io::CrateDocInfo;
 use crate::error::Result;
-use crate::ui::{filter_candidates, CandidateKind, CompletionCandidate, Focus, Tab};
 use crate::ui::theme::Theme;
+use crate::ui::{filter_candidates, CandidateKind, CompletionCandidate, Focus, Tab};
 
 use ratatui::widgets::ListState;
 use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::thread;
 
@@ -122,8 +124,8 @@ impl App {
     }
 
     /// Analyze a Rust project
-    pub fn analyze_project(&mut self, path: &PathBuf) -> Result<()> {
-        self.project_path = Some(path.clone());
+    pub fn analyze_project(&mut self, path: &Path) -> Result<()> {
+        self.project_path = Some(path.to_path_buf());
         self.status_message = format!("Analyzing {}...", path.display());
 
         // Try to analyze Cargo.toml for dependencies
@@ -247,7 +249,11 @@ impl App {
                     .cmp(&self.dependency_tree[b].0.to_lowercase())
             });
             self.filtered_dependency_indices = indices;
-            if self.list_state.selected().is_some_and(|s| s >= self.filtered_dependency_indices.len()) {
+            if self
+                .list_state
+                .selected()
+                .is_some_and(|s| s >= self.filtered_dependency_indices.len())
+            {
                 self.list_state.select(Some(0));
             }
             self.filtered_candidates = Vec::new();
@@ -274,8 +280,7 @@ impl App {
                 };
 
                 // Filter by search
-                let search_match =
-                    query.is_empty() || item.name().to_lowercase().contains(&query);
+                let search_match = query.is_empty() || item.name().to_lowercase().contains(&query);
 
                 tab_match && search_match
             })
@@ -283,7 +288,11 @@ impl App {
             .collect();
 
         // Reset selection if out of bounds
-        if self.list_state.selected().is_some_and(|s| s >= self.filtered_items.len()) {
+        if self
+            .list_state
+            .selected()
+            .is_some_and(|s| s >= self.filtered_items.len())
+        {
             self.list_state.select(Some(0));
         }
 
@@ -292,7 +301,12 @@ impl App {
         self.filtered_candidates = match self.current_tab {
             Tab::Types => matched
                 .into_iter()
-                .filter(|c| matches!(c.kind, CandidateKind::Struct | CandidateKind::Enum | CandidateKind::Type))
+                .filter(|c| {
+                    matches!(
+                        c.kind,
+                        CandidateKind::Struct | CandidateKind::Enum | CandidateKind::Type
+                    )
+                })
                 .collect(),
             Tab::Functions => matched
                 .into_iter()
@@ -311,11 +325,16 @@ impl App {
     pub fn scan_installed_crates(&mut self) -> Result<()> {
         self.status_message = "Scanning installed crates...".to_string();
         self.crate_registry.scan()?;
-        self.installed_crates_list = self.crate_registry.crate_names()
+        self.installed_crates_list = self
+            .crate_registry
+            .crate_names()
             .into_iter()
             .map(|s| s.to_string())
             .collect();
-        self.status_message = format!("Found {} installed crates", self.installed_crates_list.len());
+        self.status_message = format!(
+            "Found {} installed crates",
+            self.installed_crates_list.len()
+        );
         Ok(())
     }
 
@@ -323,10 +342,11 @@ impl App {
     /// Supports qualified path search like "serde::de::Deserialize"
     fn filter_installed_crates(&mut self) {
         let query = self.search_input.to_lowercase();
-        
+
         if self.selected_installed_crate.is_some() {
             // Filter items within selected crate by qualified path or name
-            self.installed_crate_filtered = self.installed_crate_items
+            self.installed_crate_filtered = self
+                .installed_crate_items
                 .iter()
                 .enumerate()
                 .filter(|(_, item)| {
@@ -348,9 +368,13 @@ impl App {
                 .map(|(i, _)| i)
                 .collect();
         }
-        
+
         // Reset selection if out of bounds
-        if self.list_state.selected().is_some_and(|s| s >= self.get_current_list_len()) {
+        if self
+            .list_state
+            .selected()
+            .is_some_and(|s| s >= self.get_current_list_len())
+        {
             self.list_state.select(Some(0));
         }
     }
@@ -360,54 +384,60 @@ impl App {
     pub fn search_qualified_path(&mut self) -> bool {
         let query = self.search_input.clone();
         let query = query.trim();
-        
+
         // Check for qualified path (contains ::)
         if !query.contains("::") {
             return false;
         }
-        
+
         let parts: Vec<&str> = query.split("::").collect();
         if parts.is_empty() {
             return false;
         }
-        
+
         let crate_name = parts[0].to_string();
-        
+
         // Check if crate exists
-        let crate_exists = self.installed_crates_list.iter()
-            .any(|name| name.to_lowercase() == crate_name.to_lowercase() ||
-                        name.to_lowercase().replace('-', "_") == crate_name.to_lowercase());
-        
+        let crate_exists = self.installed_crates_list.iter().any(|name| {
+            name.to_lowercase() == crate_name.to_lowercase()
+                || name.to_lowercase().replace('-', "_") == crate_name.to_lowercase()
+        });
+
         if !crate_exists {
             self.status_message = format!("Crate '{}' not found", crate_name);
             return false;
         }
-        
+
         // Find actual crate name (might have hyphens)
-        let actual_name = self.installed_crates_list.iter()
-            .find(|name| name.to_lowercase() == crate_name.to_lowercase() ||
-                         name.to_lowercase().replace('-', "_") == crate_name.to_lowercase())
+        let actual_name = self
+            .installed_crates_list
+            .iter()
+            .find(|name| {
+                name.to_lowercase() == crate_name.to_lowercase()
+                    || name.to_lowercase().replace('-', "_") == crate_name.to_lowercase()
+            })
             .cloned();
-        
+
         // Select the crate if not already selected
-        let already_selected = self.selected_installed_crate
+        let already_selected = self
+            .selected_installed_crate
             .as_ref()
             .map(|c| c.name.to_lowercase() == crate_name.to_lowercase())
             .unwrap_or(false);
-        
+
         if !already_selected {
             if let Some(name) = actual_name {
                 let _ = self.select_installed_crate(&name);
             }
         }
-        
+
         // Set search to remaining path for filtering
         if parts.len() > 1 {
             // Keep the module path part for filtering
             self.search_input = parts[1..].join("::");
             self.filter_installed_crates();
         }
-        
+
         true
     }
 
@@ -416,12 +446,13 @@ impl App {
         if let Some(crate_info) = self.crate_registry.latest(name) {
             self.selected_installed_crate = Some(crate_info.clone());
             self.status_message = format!("Analyzing {}...", name);
-            
+
             match self.crate_registry.analyze_crate(name, None) {
                 Ok(items) => {
                     self.installed_crate_items = items;
                     self.installed_crate_filtered = (0..self.installed_crate_items.len()).collect();
-                    self.status_message = format!("{}: {} items", name, self.installed_crate_items.len());
+                    self.status_message =
+                        format!("{}: {} items", name, self.installed_crate_items.len());
                 }
                 Err(e) => {
                     self.status_message = format!("Analysis failed: {}", e);
@@ -479,7 +510,9 @@ impl App {
         }
         let list_idx = self.list_state.selected().unwrap_or(0);
         let tree_idx = self.filtered_dependency_indices.get(list_idx).copied()?;
-        self.dependency_tree.get(tree_idx).map(|(name, _)| name.clone())
+        self.dependency_tree
+            .get(tree_idx)
+            .map(|(name, _)| name.clone())
     }
 
     /// Root crate name in dependency tree (first entry, depth 0). None if no tree.
@@ -511,7 +544,9 @@ impl App {
         if self.current_tab != Tab::Crates {
             return;
         }
-        let Some(name) = self.selected_dependency_name() else { return };
+        let Some(name) = self.selected_dependency_name() else {
+            return;
+        };
         if self.dependency_root_name() == Some(name.as_str()) {
             return; // selected root: show local crate_info, no fetch
         }
@@ -536,9 +571,7 @@ impl App {
                 self.installed_crate_filtered.len()
             } else {
                 let n = self.filtered_dependency_indices.len();
-                if self.dependency_tree.is_empty() {
-                    1
-                } else if n == 0 {
+                if self.dependency_tree.is_empty() || n == 0 {
                     1
                 } else {
                     n
@@ -552,7 +585,8 @@ impl App {
     /// Get the currently selected item
     pub fn selected_item(&self) -> Option<&AnalyzedItem> {
         if self.current_tab == Tab::Crates && self.selected_installed_crate.is_some() {
-            return self.list_state
+            return self
+                .list_state
                 .selected()
                 .and_then(|i| self.installed_crate_filtered.get(i))
                 .and_then(|&idx| self.installed_crate_items.get(idx));
@@ -611,7 +645,7 @@ impl App {
         self.list_state.select(Some(0));
         self.show_completion = false; // Hide completions when switching tabs
         self.filter_items();
-        
+
         // Scan crates if switching to installed crates tab
         if self.current_tab == Tab::Crates && self.installed_crates_list.is_empty() {
             let _ = self.scan_installed_crates();
@@ -623,7 +657,7 @@ impl App {
         self.list_state.select(Some(0));
         self.show_completion = false; // Hide completions when switching tabs
         self.filter_items();
-        
+
         if self.current_tab == Tab::Crates && self.installed_crates_list.is_empty() {
             let _ = self.scan_installed_crates();
         }
@@ -639,7 +673,8 @@ impl App {
 
     pub fn next_completion(&mut self) {
         if !self.filtered_candidates.is_empty() {
-            self.completion_selected = (self.completion_selected + 1) % self.filtered_candidates.len();
+            self.completion_selected =
+                (self.completion_selected + 1) % self.filtered_candidates.len();
         }
     }
 
@@ -665,13 +700,15 @@ impl App {
         self.search_input.push(c);
         self.filter_items();
         // Don't show completions in Crates tab - use direct qualified path search
-        self.show_completion = self.search_input.len() >= 2 && !(self.current_tab == Tab::Crates && self.selected_installed_crate.is_some());
+        self.show_completion = self.search_input.len() >= 2
+            && !(self.current_tab == Tab::Crates && self.selected_installed_crate.is_some());
     }
 
     pub fn on_backspace(&mut self) {
         self.search_input.pop();
         self.filter_items();
-        self.show_completion = self.search_input.len() >= 2 && !(self.current_tab == Tab::Crates && self.selected_installed_crate.is_some());
+        self.show_completion = self.search_input.len() >= 2
+            && !(self.current_tab == Tab::Crates && self.selected_installed_crate.is_some());
     }
 
     pub fn clear_search(&mut self) {
@@ -688,5 +725,139 @@ impl App {
 impl Default for App {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analyzer::RustAnalyzer;
+
+    fn make_app_with_items() -> App {
+        let source = r#"
+            pub struct Foo {}
+            pub fn bar() {}
+            pub mod baz {}
+        "#;
+        let items = RustAnalyzer::new().analyze_source(source).unwrap();
+        let mut app = App::new();
+        app.items = items;
+        app.filtered_items = vec![0, 1, 2];
+        app.list_state.select(Some(0));
+        app
+    }
+
+    #[test]
+    fn test_get_current_list_len_types_tab() {
+        let mut app = make_app_with_items();
+        app.current_tab = Tab::Types;
+        app.filter_items();
+        assert_eq!(app.get_current_list_len(), 1);
+    }
+
+    #[test]
+    fn test_get_current_list_len_functions_tab() {
+        let mut app = make_app_with_items();
+        app.current_tab = Tab::Functions;
+        app.filter_items();
+        assert_eq!(app.get_current_list_len(), 1);
+    }
+
+    #[test]
+    fn test_get_current_list_len_crates_tab_empty_tree() {
+        let mut app = App::new();
+        app.current_tab = Tab::Crates;
+        app.dependency_tree = vec![];
+        app.filtered_dependency_indices = vec![];
+        assert_eq!(app.get_current_list_len(), 1);
+    }
+
+    #[test]
+    fn test_get_current_list_len_crates_tab_with_deps() {
+        let mut app = App::new();
+        app.current_tab = Tab::Crates;
+        app.dependency_tree = vec![
+            ("oracle".to_string(), 0),
+            ("serde".to_string(), 1),
+            ("ratatui".to_string(), 1),
+        ];
+        app.filtered_dependency_indices = vec![0, 1, 2];
+        assert_eq!(app.get_current_list_len(), 3);
+    }
+
+    #[test]
+    fn test_selected_dependency_name_none_when_wrong_tab() {
+        let mut app = App::new();
+        app.current_tab = Tab::Types;
+        app.dependency_tree = vec![("oracle".to_string(), 0)];
+        app.filtered_dependency_indices = vec![0];
+        app.list_state.select(Some(0));
+        assert!(app.selected_dependency_name().is_none());
+    }
+
+    #[test]
+    fn test_selected_dependency_name_returns_selected() {
+        let mut app = App::new();
+        app.current_tab = Tab::Crates;
+        app.dependency_tree = vec![
+            ("oracle".to_string(), 0),
+            ("serde".to_string(), 1),
+        ];
+        app.filtered_dependency_indices = vec![0, 1];
+        app.list_state.select(Some(1));
+        assert_eq!(app.selected_dependency_name(), Some("serde".to_string()));
+    }
+
+    #[test]
+    fn test_dependency_root_name() {
+        let mut app = App::new();
+        app.dependency_tree = vec![
+            ("oracle".to_string(), 0),
+            ("serde".to_string(), 1),
+        ];
+        assert_eq!(app.dependency_root_name(), Some("oracle"));
+        app.dependency_tree.clear();
+        assert!(app.dependency_root_name().is_none());
+    }
+
+    #[test]
+    fn test_selected_item_types_tab() {
+        let mut app = make_app_with_items();
+        app.current_tab = Tab::Types;
+        app.filter_items();
+        app.list_state.select(Some(0));
+        let item = app.selected_item().unwrap();
+        assert_eq!(item.name(), "Foo");
+    }
+
+    #[test]
+    fn test_get_filtered_items() {
+        let mut app = make_app_with_items();
+        app.current_tab = Tab::Types;
+        app.filter_items();
+        let filtered = app.get_filtered_items();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].name(), "Foo");
+    }
+
+    #[test]
+    fn test_installed_crates_display_list_empty_tree_returns_all_installed() {
+        let mut app = App::new();
+        app.dependency_tree = vec![];
+        app.installed_crates_list = vec!["foo".into(), "bar".into()];
+        let list = app.installed_crates_display_list();
+        assert_eq!(list, vec!["foo", "bar"]);
+    }
+
+    #[test]
+    fn test_installed_crates_display_list_filters_by_project_deps() {
+        let mut app = App::new();
+        app.dependency_tree = vec![
+            ("oracle".to_string(), 0),
+            ("serde".to_string(), 1),
+        ];
+        app.installed_crates_list = vec!["serde".into(), "other".into()];
+        let list = app.installed_crates_display_list();
+        assert_eq!(list, vec!["serde"]);
     }
 }

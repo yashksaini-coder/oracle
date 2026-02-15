@@ -36,19 +36,26 @@ Built with [Ratatui](https://ratatui.rs) for a smooth, responsive TUI experience
 
 ## 📦 Installation
 
-### From Source
+### From crates.io (recommended)
 
-```bash
-git clone https://github.com/your-username/oracle.git
-cd oracle
-cargo install --path .
-```
-
-### Using Cargo
+With Rust and Cargo installed:
 
 ```bash
 cargo install oracle
 ```
+
+### From source
+
+```bash
+git clone https://github.com/yashksaini-coder/oracle.git
+cd oracle
+cargo install --path .
+# or: make install
+```
+
+### Pre-built binaries
+
+See [Releases](https://github.com/yashksaini-coder/oracle/releases) for Linux (x86_64), macOS (x86_64, Apple Silicon), and Windows (x86_64) binaries.
 
 ## 🚀 Usage
 
@@ -99,6 +106,11 @@ make release
 # See all commands
 make help
 ```
+
+## 📤 Releasing (maintainers)
+
+- **Publish to crates.io** (after `cargo login`): `make publish-dry-run` then `make publish`.
+- **GitHub Release**: Push a version tag (e.g. `v0.1.0`). The [release workflow](.github/workflows/release.yml) builds binaries for Linux, macOS (Intel + Apple Silicon), and Windows and creates a release. Optionally set `CARGO_REGISTRY_TOKEN` in repo secrets to auto-publish to crates.io on tag push.
 
 ## 🏗️ Architecture
 
@@ -155,8 +167,8 @@ This project is licensed under the [MIT License](LICENSE).
 </div>
 
 <!-- Badges -->
-[CI Badge]: https://img.shields.io/github/actions/workflow/status/user/oracle/ci.yml?style=flat-square&logo=github&label=CI
-[CI]: https://github.com/user/oracle/actions/workflows/ci.yml
+[CI Badge]: https://img.shields.io/github/actions/workflow/status/yashksaini-coder/oracle/ci.yml?style=flat-square&logo=github&label=CI
+[CI]: https://github.com/yashksaini-coder/oracle/actions/workflows/ci.yml
 [License Badge]: https://img.shields.io/badge/license-MIT-blue?style=flat-square
 [License]: ./LICENSE
 [Rust Badge]: https://img.shields.io/badge/rust-1.75+-orange?style=flat-square&logo=rust

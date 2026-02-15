@@ -250,27 +250,59 @@ pub struct StructInfo {
 
 impl StructInfo {
     pub fn full_definition(&self) -> String {
-        let vis = if self.visibility == Visibility::Public { "pub " } else { "" };
+        let vis = if self.visibility == Visibility::Public {
+            "pub "
+        } else {
+            ""
+        };
         let generics = if self.generics.is_empty() {
             String::new()
         } else {
             format!("<{}>", self.generics.join(", "))
         };
-        
+
         match self.kind {
             StructKind::Named => {
-                let fields: Vec<String> = self.fields.iter().map(|f| {
-                    let fvis = if f.visibility == Visibility::Public { "pub " } else { "" };
-                    format!("    {}{}: {}", fvis, f.name, f.ty)
-                }).collect();
-                format!("{}struct {}{} {{\n{}\n}}", vis, self.name, generics, fields.join(",\n"))
+                let fields: Vec<String> = self
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        let fvis = if f.visibility == Visibility::Public {
+                            "pub "
+                        } else {
+                            ""
+                        };
+                        format!("    {}{}: {}", fvis, f.name, f.ty)
+                    })
+                    .collect();
+                format!(
+                    "{}struct {}{} {{\n{}\n}}",
+                    vis,
+                    self.name,
+                    generics,
+                    fields.join(",\n")
+                )
             }
             StructKind::Tuple => {
-                let fields: Vec<String> = self.fields.iter().map(|f| {
-                    let fvis = if f.visibility == Visibility::Public { "pub " } else { "" };
-                    format!("{}{}", fvis, f.ty)
-                }).collect();
-                format!("{}struct {}{}({});", vis, self.name, generics, fields.join(", "))
+                let fields: Vec<String> = self
+                    .fields
+                    .iter()
+                    .map(|f| {
+                        let fvis = if f.visibility == Visibility::Public {
+                            "pub "
+                        } else {
+                            ""
+                        };
+                        format!("{}{}", fvis, f.ty)
+                    })
+                    .collect();
+                format!(
+                    "{}struct {}{}({});",
+                    vis,
+                    self.name,
+                    generics,
+                    fields.join(", ")
+                )
             }
             StructKind::Unit => format!("{}struct {}{};", vis, self.name, generics),
         }
@@ -311,26 +343,43 @@ pub struct EnumInfo {
 
 impl EnumInfo {
     pub fn full_definition(&self) -> String {
-        let vis = if self.visibility == Visibility::Public { "pub " } else { "" };
+        let vis = if self.visibility == Visibility::Public {
+            "pub "
+        } else {
+            ""
+        };
         let generics = if self.generics.is_empty() {
             String::new()
         } else {
             format!("<{}>", self.generics.join(", "))
         };
-        
-        let variants: Vec<String> = self.variants.iter().map(|v| {
-            let fields = match &v.fields {
-                VariantFields::Named(fields) => {
-                    let f: Vec<_> = fields.iter().map(|f| format!("{}: {}", f.name, f.ty)).collect();
-                    format!(" {{ {} }}", f.join(", "))
-                }
-                VariantFields::Unnamed(types) => format!("({})", types.join(", ")),
-                VariantFields::Unit => String::new(),
-            };
-            format!("    {}{}", v.name, fields)
-        }).collect();
-        
-        format!("{}enum {}{} {{\n{}\n}}", vis, self.name, generics, variants.join(",\n"))
+
+        let variants: Vec<String> = self
+            .variants
+            .iter()
+            .map(|v| {
+                let fields = match &v.fields {
+                    VariantFields::Named(fields) => {
+                        let f: Vec<_> = fields
+                            .iter()
+                            .map(|f| format!("{}: {}", f.name, f.ty))
+                            .collect();
+                        format!(" {{ {} }}", f.join(", "))
+                    }
+                    VariantFields::Unnamed(types) => format!("({})", types.join(", ")),
+                    VariantFields::Unit => String::new(),
+                };
+                format!("    {}{}", v.name, fields)
+            })
+            .collect();
+
+        format!(
+            "{}enum {}{} {{\n{}\n}}",
+            vis,
+            self.name,
+            generics,
+            variants.join(",\n")
+        )
     }
 }
 
@@ -371,7 +420,11 @@ pub struct TraitInfo {
 
 impl TraitInfo {
     pub fn full_definition(&self) -> String {
-        let vis = if self.visibility == Visibility::Public { "pub " } else { "" };
+        let vis = if self.visibility == Visibility::Public {
+            "pub "
+        } else {
+            ""
+        };
         let unsafe_str = if self.is_unsafe { "unsafe " } else { "" };
         let auto_str = if self.is_auto { "auto " } else { "" };
         let generics = if self.generics.is_empty() {
@@ -384,7 +437,7 @@ impl TraitInfo {
         } else {
             format!(": {}", self.supertraits.join(" + "))
         };
-        
+
         let mut items = Vec::new();
         for at in &self.associated_types {
             items.push(format!("    type {};", at.name));
@@ -392,8 +445,17 @@ impl TraitInfo {
         for method in &self.methods {
             items.push(format!("    {};", method.signature));
         }
-        
-        format!("{}{}{}trait {}{}{} {{\n{}\n}}", vis, unsafe_str, auto_str, self.name, generics, bounds, items.join("\n"))
+
+        format!(
+            "{}{}{}trait {}{}{} {{\n{}\n}}",
+            vis,
+            unsafe_str,
+            auto_str,
+            self.name,
+            generics,
+            bounds,
+            items.join("\n")
+        )
     }
 }
 
@@ -447,9 +509,12 @@ impl ImplInfo {
         } else {
             format!("<{}>", self.generics.join(", "))
         };
-        
+
         match &self.trait_name {
-            Some(trait_name) => format!("{}impl{} {}{} for {}", unsafe_str, generics, negative_str, trait_name, self.self_ty),
+            Some(trait_name) => format!(
+                "{}impl{} {}{} for {}",
+                unsafe_str, generics, negative_str, trait_name, self.self_ty
+            ),
             None => format!("impl{} {}", generics, self.self_ty),
         }
     }

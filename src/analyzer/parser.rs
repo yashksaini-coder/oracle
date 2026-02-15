@@ -5,7 +5,9 @@ use crate::error::Result;
 use quote::ToTokens;
 use std::fs;
 use std::path::{Path, PathBuf};
-use syn::{File, Item, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemStatic, ItemStruct, ItemTrait, ItemType};
+use syn::{
+    File, Item, ItemConst, ItemEnum, ItemFn, ItemImpl, ItemStatic, ItemStruct, ItemTrait, ItemType,
+};
 
 /// Rust source code analyzer using syn for parsing
 pub struct RustAnalyzer {
@@ -31,7 +33,11 @@ impl RustAnalyzer {
     }
 
     /// Analyze a Rust source file with a base module path prefix
-    pub fn analyze_file_with_module(&self, path: &Path, module_path: Vec<String>) -> Result<Vec<AnalyzedItem>> {
+    pub fn analyze_file_with_module(
+        &self,
+        path: &Path,
+        module_path: Vec<String>,
+    ) -> Result<Vec<AnalyzedItem>> {
         let content = fs::read_to_string(path)?;
         self.analyze_source_with_module(&content, Some(path.to_path_buf()), module_path)
     }
@@ -42,16 +48,26 @@ impl RustAnalyzer {
     }
 
     /// Analyze Rust source code with optional file path
-    pub fn analyze_source_with_path(&self, source: &str, path: Option<PathBuf>) -> Result<Vec<AnalyzedItem>> {
+    pub fn analyze_source_with_path(
+        &self,
+        source: &str,
+        path: Option<PathBuf>,
+    ) -> Result<Vec<AnalyzedItem>> {
         // Derive module path from file path
-        let module_path = path.as_ref()
+        let module_path = path
+            .as_ref()
             .map(|p| Self::derive_module_path(p))
             .unwrap_or_default();
         self.analyze_source_with_module(source, path, module_path)
     }
 
     /// Analyze Rust source code with explicit module path
-    pub fn analyze_source_with_module(&self, source: &str, path: Option<PathBuf>, module_path: Vec<String>) -> Result<Vec<AnalyzedItem>> {
+    pub fn analyze_source_with_module(
+        &self,
+        source: &str,
+        path: Option<PathBuf>,
+        module_path: Vec<String>,
+    ) -> Result<Vec<AnalyzedItem>> {
         let syntax_tree: File = syn::parse_str(source)?;
         let mut items = Vec::new();
 
@@ -131,22 +147,22 @@ impl RustAnalyzer {
             .filter_map(|c| c.to_str())
             .map(|s| s.to_string())
             .collect();
-        
+
         // Remove file extension from last component
         if let Some(last) = components.last_mut() {
             if last.ends_with(".rs") {
                 *last = last.trim_end_matches(".rs").to_string();
             }
         }
-        
+
         // Find 'src' directory and take everything after it
         if let Some(src_pos) = components.iter().position(|c| c == "src") {
             components = components[src_pos + 1..].to_vec();
         }
-        
+
         // Remove special module names
         components.retain(|c| c != "lib" && c != "main" && c != "mod");
-        
+
         components
     }
 
@@ -406,14 +422,20 @@ impl RustAnalyzer {
                             .iter()
                             .map(|b| b.to_token_stream().to_string())
                             .collect(),
-                        default: ty.default.as_ref().map(|(_, t)| t.to_token_stream().to_string()),
+                        default: ty
+                            .default
+                            .as_ref()
+                            .map(|(_, t)| t.to_token_stream().to_string()),
                     });
                 }
                 syn::TraitItem::Const(c) => {
                     associated_consts.push(AssociatedConst {
                         name: c.ident.to_string(),
                         ty: c.ty.to_token_stream().to_string(),
-                        default: c.default.as_ref().map(|(_, e)| e.to_token_stream().to_string()),
+                        default: c
+                            .default
+                            .as_ref()
+                            .map(|(_, e)| e.to_token_stream().to_string()),
                     });
                 }
                 _ => {}
@@ -441,9 +463,15 @@ impl RustAnalyzer {
 
     fn analyze_impl(&self, im: &ItemImpl) -> AnalyzedItem {
         let self_ty = im.self_ty.to_token_stream().to_string();
-        let trait_name = im.trait_.as_ref().map(|(_, path, _)| path.to_token_stream().to_string());
+        let trait_name = im
+            .trait_
+            .as_ref()
+            .map(|(_, path, _)| path.to_token_stream().to_string());
         let is_unsafe = im.unsafety.is_some();
-        let is_negative = im.trait_.as_ref().is_some_and(|(bang, _, _)| bang.is_some());
+        let is_negative = im
+            .trait_
+            .as_ref()
+            .is_some_and(|(bang, _, _)| bang.is_some());
         let generics = Self::extract_generics(&im.generics);
         let where_clause = Self::extract_where_clause(&im.generics.where_clause);
 
@@ -605,7 +633,9 @@ impl RustAnalyzer {
             .collect()
     }
 
-    fn extract_parameters(inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::Token![,]>) -> Vec<Parameter> {
+    fn extract_parameters(
+        inputs: &syn::punctuated::Punctuated<syn::FnArg, syn::Token![,]>,
+    ) -> Vec<Parameter> {
         inputs
             .iter()
             .map(|arg| match arg {
@@ -635,7 +665,9 @@ impl RustAnalyzer {
     }
 
     fn extract_where_clause(where_clause: &Option<syn::WhereClause>) -> Option<String> {
-        where_clause.as_ref().map(|w| w.to_token_stream().to_string())
+        where_clause
+            .as_ref()
+            .map(|w| w.to_token_stream().to_string())
     }
 
     fn extract_docs(attrs: &[syn::Attribute]) -> Option<String> {
@@ -749,6 +781,54 @@ mod tests {
             assert!(s.derives.contains(&"Clone".to_string()));
         } else {
             panic!("Expected struct");
+        }
+    }
+
+    #[test]
+    fn test_analyze_enum() {
+        let source = r#"
+            pub enum Result<T, E> {
+                Ok(T),
+                Err(E),
+            }
+        "#;
+        let analyzer = RustAnalyzer::new();
+        let items = analyzer.analyze_source(source).unwrap();
+        assert_eq!(items.len(), 1);
+        if let AnalyzedItem::Enum(e) = &items[0] {
+            assert_eq!(e.name, "Result");
+            assert_eq!(e.variants.len(), 2);
+        } else {
+            panic!("Expected enum");
+        }
+    }
+
+    #[test]
+    fn test_analyze_module_path_from_path() {
+        use std::path::Path;
+        assert_eq!(
+            RustAnalyzer::derive_module_path(Path::new("src/lib.rs")),
+            Vec::<String>::new()
+        );
+        assert_eq!(
+            RustAnalyzer::derive_module_path(Path::new("src/foo/bar.rs")),
+            vec!["foo".to_string(), "bar".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_analyze_source_with_module_prefix() {
+        let source = "pub fn util() {}";
+        let analyzer = RustAnalyzer::new();
+        let items = analyzer
+            .analyze_source_with_module(source, None, vec!["mymod".to_string()])
+            .unwrap();
+        assert_eq!(items.len(), 1);
+        if let AnalyzedItem::Function(f) = &items[0] {
+            assert_eq!(f.name, "util");
+            assert_eq!(f.module_path.as_slice(), &["mymod"]);
+        } else {
+            panic!("Expected function");
         }
     }
 }

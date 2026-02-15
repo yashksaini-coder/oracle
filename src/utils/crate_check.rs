@@ -1,6 +1,6 @@
 //! Crate installation detection and management
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Result of checking if a crate is available
@@ -73,7 +73,7 @@ pub fn check_crate_in_registry(name: &str) -> Option<String> {
             let dir_name = crate_path.file_name()?.to_string_lossy();
 
             // Parse crate directory name (format: name-version)
-            if let Some(crate_name) = dir_name.rsplit('-').last() {
+            if let Some(crate_name) = dir_name.rsplit('-').next_back() {
                 if crate_name == name {
                     // Extract version from directory name
                     let version = dir_name
@@ -105,7 +105,7 @@ pub fn check_crate_binary(name: &str) -> bool {
 }
 
 /// Get installed crate version from Cargo.lock if available
-pub fn get_locked_version(project_path: &PathBuf, crate_name: &str) -> Option<String> {
+pub fn get_locked_version(project_path: &Path, crate_name: &str) -> Option<String> {
     let lock_path = project_path.join("Cargo.lock");
     if !lock_path.exists() {
         return None;
@@ -128,10 +128,7 @@ pub fn get_locked_version(project_path: &PathBuf, crate_name: &str) -> Option<St
 
         if in_package {
             if line.starts_with("name = ") {
-                current_name = line
-                    .strip_prefix("name = ")?
-                    .trim_matches('"')
-                    .to_string();
+                current_name = line.strip_prefix("name = ")?.trim_matches('"').to_string();
             } else if line.starts_with("version = ") && current_name == crate_name {
                 return Some(
                     line.strip_prefix("version = ")?

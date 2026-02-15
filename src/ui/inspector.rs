@@ -6,14 +6,14 @@ use ratatui::{
     style::Modifier,
     text::{Line, Span},
     widgets::{
-        block::BorderType,
-        Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap,
+        block::BorderType, Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, StatefulWidget, Widget, Wrap,
     },
 };
 
 use crate::analyzer::{
-    AnalyzedItem, ConstInfo, EnumInfo, FunctionInfo, ImplInfo, ModuleInfo, 
-    StaticInfo, StructInfo, StructKind, TraitInfo, TypeAliasInfo, VariantFields, Visibility,
+    AnalyzedItem, ConstInfo, EnumInfo, FunctionInfo, ImplInfo, ModuleInfo, StaticInfo, StructInfo,
+    StructKind, TraitInfo, TypeAliasInfo, VariantFields, Visibility,
 };
 use crate::ui::theme::Theme;
 
@@ -61,7 +61,10 @@ impl<'a> InspectorPanel<'a> {
     fn section_header(&self, title: &str) -> Line<'static> {
         Line::from(vec![
             Span::styled("▸ ", self.theme.style_accent()),
-            Span::styled(title.to_string(), self.theme.style_accent().add_modifier(Modifier::BOLD)),
+            Span::styled(
+                title.to_string(),
+                self.theme.style_accent().add_modifier(Modifier::BOLD),
+            ),
             Span::styled(" ─────────────────", self.theme.style_muted()),
         ])
     }
@@ -94,15 +97,12 @@ impl<'a> InspectorPanel<'a> {
 
         let help_text = vec![
             Line::from(""),
-            Line::from(Span::styled(
-                "  No item selected",
-                self.theme.style_muted(),
-            )),
+            Line::from(Span::styled("  No item selected", self.theme.style_muted())),
             Line::from(""),
             Line::from("  Select an item from the list to view"),
             Line::from("  detailed API information."),
             Line::from(""),
-            Line::from(self.section_header("Navigation")),
+            self.section_header("Navigation"),
             Line::from(""),
             Line::from(vec![
                 Span::raw("  "),
@@ -139,7 +139,9 @@ impl<'a> InspectorPanel<'a> {
             Span::styled("fn ", self.theme.style_keyword()),
             Span::styled(
                 func.name.clone(),
-                self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED),
+                self.theme
+                    .style_accent_bold()
+                    .add_modifier(Modifier::UNDERLINED),
             ),
         ];
 
@@ -154,12 +156,15 @@ impl<'a> InspectorPanel<'a> {
         }
 
         lines.push(Line::from(header));
-        
+
         // Show qualified path if present
         if !func.module_path.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("  use ", self.theme.style_keyword()),
-                Span::styled(format!("{}::{}", func.module_path.join("::"), func.name), self.theme.style_type()),
+                Span::styled(
+                    format!("{}::{}", func.module_path.join("::"), func.name),
+                    self.theme.style_type(),
+                ),
                 Span::styled(";", self.theme.style_normal()),
             ]));
         }
@@ -191,16 +196,22 @@ impl<'a> InspectorPanel<'a> {
         lines.push(self.section_header("Overview"));
         lines.push(Line::from(""));
         lines.push(self.key_value("Visibility:", func.visibility.to_string()));
-        
+
         // Function properties
         let mut props = Vec::new();
-        if func.is_async { props.push("async"); }
-        if func.is_const { props.push("const"); }
-        if func.is_unsafe { props.push("unsafe"); }
+        if func.is_async {
+            props.push("async");
+        }
+        if func.is_const {
+            props.push("const");
+        }
+        if func.is_unsafe {
+            props.push("unsafe");
+        }
         if !props.is_empty() {
             lines.push(self.key_value("Modifiers:", props.join(", ")));
         }
-        
+
         if !func.generics.is_empty() {
             lines.push(self.key_value("Generics:", format!("<{}>", func.generics.join(", "))));
         }
@@ -222,7 +233,7 @@ impl<'a> InspectorPanel<'a> {
                     } else {
                         "self"
                     };
-                    
+
                     let ownership_hint = if param.is_ref && param.is_mut {
                         "mutable borrow"
                     } else if param.is_ref {
@@ -230,7 +241,7 @@ impl<'a> InspectorPanel<'a> {
                     } else {
                         "takes ownership"
                     };
-                    
+
                     lines.push(Line::from(vec![
                         Span::styled(format!("  {}. ", i + 1), self.theme.style_number()),
                         Span::styled(self_str, self.theme.style_keyword()),
@@ -246,7 +257,7 @@ impl<'a> InspectorPanel<'a> {
                         Span::styled(": ", self.theme.style_muted()),
                         Span::styled(param.ty.clone(), self.theme.style_type()),
                     ]));
-                    
+
                     // Ownership/borrowing analysis
                     let ty_str = &param.ty;
                     let hint = if ty_str.starts_with('&') && ty_str.contains("mut") {
@@ -260,7 +271,7 @@ impl<'a> InspectorPanel<'a> {
                     } else {
                         None
                     };
-                    
+
                     if let Some(h) = hint {
                         lines.push(Line::from(vec![
                             Span::raw("       "),
@@ -283,20 +294,23 @@ impl<'a> InspectorPanel<'a> {
         lines.push(Line::from(""));
         lines.push(self.section_header("Returns"));
         lines.push(Line::from(""));
-        
+
         if let Some(ref ret) = func.return_type {
             lines.push(Line::from(vec![
                 Span::raw("  "),
                 Span::styled("→ ", self.theme.style_accent()),
                 Span::styled(ret.clone(), self.theme.style_type()),
             ]));
-            
+
             // Add helpful hints for common return types
             let ret_lower = ret.to_lowercase();
             if ret_lower.contains("result") {
                 lines.push(Line::from(vec![
                     Span::raw("       "),
-                    Span::styled("⚠ Can fail - handle errors appropriately", self.theme.style_warning()),
+                    Span::styled(
+                        "⚠ Can fail - handle errors appropriately",
+                        self.theme.style_warning(),
+                    ),
                 ]));
             } else if ret_lower.contains("option") {
                 lines.push(Line::from(vec![
@@ -361,22 +375,30 @@ impl<'a> InspectorPanel<'a> {
         // Header with type badge
         let kind_str = match st.kind {
             StructKind::Named => "struct",
-            StructKind::Tuple => "tuple struct", 
+            StructKind::Tuple => "tuple struct",
             StructKind::Unit => "unit struct",
         };
 
         lines.push(Line::from(vec![
             Span::styled("struct ", self.theme.style_keyword()),
-            Span::styled(st.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)),
+            Span::styled(
+                st.name.clone(),
+                self.theme
+                    .style_accent_bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
             Span::raw(" "),
             Span::styled(format!("({})", kind_str), self.theme.style_muted()),
         ]));
-        
+
         // Show qualified path if present
         if !st.module_path.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("  use ", self.theme.style_keyword()),
-                Span::styled(format!("{}::{}", st.module_path.join("::"), st.name), self.theme.style_type()),
+                Span::styled(
+                    format!("{}::{}", st.module_path.join("::"), st.name),
+                    self.theme.style_type(),
+                ),
                 Span::styled(";", self.theme.style_normal()),
             ]));
         }
@@ -410,7 +432,7 @@ impl<'a> InspectorPanel<'a> {
         lines.push(self.key_value("Visibility:", st.visibility.to_string()));
         lines.push(self.key_value("Kind:", kind_str.to_string()));
         lines.push(self.key_value("Field Count:", st.fields.len().to_string()));
-        
+
         if !st.generics.is_empty() {
             lines.push(self.key_value("Generics:", format!("<{}>", st.generics.join(", "))));
         }
@@ -424,40 +446,78 @@ impl<'a> InspectorPanel<'a> {
             lines.push(Line::from(""));
             lines.push(self.section_header("Derived Traits"));
             lines.push(Line::from(""));
-            
+
             // Categorize derives
-            let (standard, serde_derives, other): (Vec<_>, Vec<_>, Vec<_>) = st.derives.iter()
+            let (standard, serde_derives, other): (Vec<_>, Vec<_>, Vec<_>) = st
+                .derives
+                .iter()
                 .fold((vec![], vec![], vec![]), |mut acc, d| {
                     let d_lower = d.to_lowercase();
-                    if ["debug", "clone", "copy", "default", "partialeq", "eq", "partialord", "ord", "hash"].contains(&d_lower.as_str()) {
+                    if [
+                        "debug",
+                        "clone",
+                        "copy",
+                        "default",
+                        "partialeq",
+                        "eq",
+                        "partialord",
+                        "ord",
+                        "hash",
+                    ]
+                    .contains(&d_lower.as_str())
+                    {
                         acc.0.push(d);
-                    } else if d_lower.contains("serde") || d_lower == "serialize" || d_lower == "deserialize" {
+                    } else if d_lower.contains("serde")
+                        || d_lower == "serialize"
+                        || d_lower == "deserialize"
+                    {
                         acc.1.push(d);
                     } else {
                         acc.2.push(d);
                     }
                     acc
                 });
-            
+
             if !standard.is_empty() {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("Standard: ", self.theme.style_dim()),
-                    Span::styled(standard.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "), self.theme.style_type()),
+                    Span::styled(
+                        standard
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        self.theme.style_type(),
+                    ),
                 ]));
             }
             if !serde_derives.is_empty() {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("Serde: ", self.theme.style_dim()),
-                    Span::styled(serde_derives.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "), self.theme.style_type()),
+                    Span::styled(
+                        serde_derives
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        self.theme.style_type(),
+                    ),
                 ]));
             }
             if !other.is_empty() {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("Other: ", self.theme.style_dim()),
-                    Span::styled(other.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(", "), self.theme.style_type()),
+                    Span::styled(
+                        other
+                            .iter()
+                            .map(|s| s.as_str())
+                            .collect::<Vec<_>>()
+                            .join(", "),
+                        self.theme.style_type(),
+                    ),
                 ]));
             }
         }
@@ -475,7 +535,7 @@ impl<'a> InspectorPanel<'a> {
                     Visibility::Super => "pub(super) ",
                     _ => "",
                 };
-                
+
                 lines.push(Line::from(vec![
                     Span::styled(format!("  {}. ", i + 1), self.theme.style_number()),
                     Span::styled(vis_str.to_string(), self.theme.style_keyword()),
@@ -483,7 +543,7 @@ impl<'a> InspectorPanel<'a> {
                     Span::styled(": ", self.theme.style_muted()),
                     Span::styled(field.ty.clone(), self.theme.style_type()),
                 ]));
-                
+
                 // Type analysis hints
                 let ty_lower = field.ty.to_lowercase();
                 if ty_lower.contains("option") {
@@ -491,18 +551,24 @@ impl<'a> InspectorPanel<'a> {
                         Span::raw("       "),
                         Span::styled("⚪ Optional field", self.theme.style_muted()),
                     ]));
-                } else if ty_lower.contains("vec") || ty_lower.contains("hashmap") || ty_lower.contains("btreemap") {
+                } else if ty_lower.contains("vec")
+                    || ty_lower.contains("hashmap")
+                    || ty_lower.contains("btreemap")
+                {
                     lines.push(Line::from(vec![
                         Span::raw("       "),
                         Span::styled("📦 Collection type", self.theme.style_muted()),
                     ]));
-                } else if ty_lower.contains("box") || ty_lower.contains("rc") || ty_lower.contains("arc") {
+                } else if ty_lower.contains("box")
+                    || ty_lower.contains("rc")
+                    || ty_lower.contains("arc")
+                {
                     lines.push(Line::from(vec![
                         Span::raw("       "),
                         Span::styled("🔗 Heap-allocated/Shared", self.theme.style_muted()),
                     ]));
                 }
-                
+
                 if let Some(ref doc) = field.documentation {
                     for doc_line in doc.lines().take(2) {
                         let trimmed = doc_line.trim_start_matches('/').trim_start();
@@ -521,22 +587,31 @@ impl<'a> InspectorPanel<'a> {
         lines.push(Line::from(""));
         lines.push(self.section_header("Usage"));
         lines.push(Line::from(""));
-        
+
         // Construction hint
         match st.kind {
             StructKind::Named => {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("let instance = ", self.theme.style_dim()),
-                    Span::styled(format!("{} {{ ... }};", st.name), self.theme.style_function()),
+                    Span::styled(
+                        format!("{} {{ ... }};", st.name),
+                        self.theme.style_function(),
+                    ),
                 ]));
             }
             StructKind::Tuple => {
-                let placeholders = (0..st.fields.len()).map(|_| "_").collect::<Vec<_>>().join(", ");
+                let placeholders = (0..st.fields.len())
+                    .map(|_| "_")
+                    .collect::<Vec<_>>()
+                    .join(", ");
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("let instance = ", self.theme.style_dim()),
-                    Span::styled(format!("{}({});", st.name, placeholders), self.theme.style_function()),
+                    Span::styled(
+                        format!("{}({});", st.name, placeholders),
+                        self.theme.style_function(),
+                    ),
                 ]));
             }
             StructKind::Unit => {
@@ -553,7 +628,10 @@ impl<'a> InspectorPanel<'a> {
             lines.push(Line::from(vec![
                 Span::raw("  "),
                 Span::styled("let instance = ", self.theme.style_dim()),
-                Span::styled(format!("{}::default();", st.name), self.theme.style_function()),
+                Span::styled(
+                    format!("{}::default();", st.name),
+                    self.theme.style_function(),
+                ),
             ]));
         }
 
@@ -592,14 +670,22 @@ impl<'a> InspectorPanel<'a> {
 
         lines.push(Line::from(vec![
             Span::styled("enum ", self.theme.style_keyword()),
-            Span::styled(en.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)),
+            Span::styled(
+                en.name.clone(),
+                self.theme
+                    .style_accent_bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
         ]));
-        
+
         // Show qualified path if present
         if !en.module_path.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("  use ", self.theme.style_keyword()),
-                Span::styled(format!("{}::{}", en.module_path.join("::"), en.name), self.theme.style_type()),
+                Span::styled(
+                    format!("{}::{}", en.module_path.join("::"), en.name),
+                    self.theme.style_type(),
+                ),
                 Span::styled(";", self.theme.style_normal()),
             ]));
         }
@@ -610,7 +696,7 @@ impl<'a> InspectorPanel<'a> {
         lines.push(Line::from(""));
         lines.push(self.key_value("Visibility:", en.visibility.to_string()));
         lines.push(self.key_value("Variants:", en.variants.len().to_string()));
-        
+
         if !en.generics.is_empty() {
             lines.push(self.key_value("Generics:", format!("<{}>", en.generics.join(", "))));
         }
@@ -636,14 +722,19 @@ impl<'a> InspectorPanel<'a> {
         for (i, variant) in en.variants.iter().enumerate() {
             let fields_str = match &variant.fields {
                 VariantFields::Named(fields) => {
-                    let f: Vec<_> = fields.iter().map(|f| format!("{}: {}", f.name, f.ty)).collect();
+                    let f: Vec<_> = fields
+                        .iter()
+                        .map(|f| format!("{}: {}", f.name, f.ty))
+                        .collect();
                     format!(" {{ {} }}", f.join(", "))
                 }
                 VariantFields::Unnamed(types) => format!("({})", types.join(", ")),
                 VariantFields::Unit => String::new(),
             };
 
-            let discriminant = variant.discriminant.as_ref()
+            let discriminant = variant
+                .discriminant
+                .as_ref()
                 .map(|d| format!(" = {}", d))
                 .unwrap_or_default();
 
@@ -685,7 +776,12 @@ impl<'a> InspectorPanel<'a> {
 
         let mut header = vec![
             Span::styled("trait ", self.theme.style_keyword()),
-            Span::styled(tr.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)),
+            Span::styled(
+                tr.name.clone(),
+                self.theme
+                    .style_accent_bold()
+                    .add_modifier(Modifier::UNDERLINED),
+            ),
         ];
 
         if tr.is_unsafe {
@@ -696,12 +792,15 @@ impl<'a> InspectorPanel<'a> {
         }
 
         lines.push(Line::from(header));
-        
+
         // Show qualified path if present
         if !tr.module_path.is_empty() {
             lines.push(Line::from(vec![
                 Span::styled("  use ", self.theme.style_keyword()),
-                Span::styled(format!("{}::{}", tr.module_path.join("::"), tr.name), self.theme.style_type()),
+                Span::styled(
+                    format!("{}::{}", tr.module_path.join("::"), tr.name),
+                    self.theme.style_type(),
+                ),
                 Span::styled(";", self.theme.style_normal()),
             ]));
         }
@@ -712,7 +811,7 @@ impl<'a> InspectorPanel<'a> {
         lines.push(Line::from(""));
         lines.push(self.key_value("Visibility:", tr.visibility.to_string()));
         lines.push(self.key_value("Methods:", tr.methods.len().to_string()));
-        
+
         if !tr.associated_types.is_empty() {
             lines.push(self.key_value("Associated Types:", tr.associated_types.len().to_string()));
         }
@@ -739,10 +838,12 @@ impl<'a> InspectorPanel<'a> {
                 } else {
                     format!(": {}", at.bounds.join(" + "))
                 };
-                let default = at.default.as_ref()
+                let default = at
+                    .default
+                    .as_ref()
                     .map(|d| format!(" = {}", d))
                     .unwrap_or_default();
-                
+
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled("type ", self.theme.style_keyword()),
@@ -759,7 +860,7 @@ impl<'a> InspectorPanel<'a> {
                 .iter()
                 .filter_map(|i| {
                     if let AnalyzedItem::Impl(im) = i {
-                        let matches = im.trait_name.as_deref().map_or(false, |tn| {
+                        let matches = im.trait_name.as_deref().is_some_and(|tn| {
                             tn == tr.name || tn.ends_with(&format!("::{}", tr.name))
                         });
                         if matches {
@@ -862,13 +963,13 @@ impl<'a> InspectorPanel<'a> {
         lines.push(self.section_header("Overview"));
         lines.push(Line::from(""));
         lines.push(self.key_value("Type:", im.self_ty.clone()));
-        
+
         if let Some(ref trait_name) = im.trait_name {
             lines.push(self.key_value("Trait:", trait_name.clone()));
         }
-        
+
         lines.push(self.key_value("Methods:", im.methods.len().to_string()));
-        
+
         if !im.generics.is_empty() {
             lines.push(self.key_value("Generics:", format!("<{}>", im.generics.join(", "))));
         }
@@ -885,7 +986,7 @@ impl<'a> InspectorPanel<'a> {
                 } else {
                     ""
                 };
-                
+
                 let mut method_line = vec![
                     Span::styled(format!("  {}. ", i + 1), self.theme.style_dim()),
                     Span::styled(vis.to_string(), self.theme.style_keyword()),
@@ -926,29 +1027,41 @@ impl<'a> InspectorPanel<'a> {
     }
 
     fn render_module(&self, module: &ModuleInfo, area: Rect, buf: &mut Buffer) {
-        let mut lines = Vec::new();
-
-        lines.push(Line::from(vec![
-            Span::styled("mod ", self.theme.style_keyword()),
-            Span::styled(module.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)),
-        ]));
-        lines.push(Line::from(""));
-
-        // Overview
-        lines.push(self.section_header("Overview"));
-        lines.push(Line::from(""));
-        lines.push(self.key_value("Visibility:", module.visibility.to_string()));
-        lines.push(self.key_value("Path:", module.path.clone()));
-        lines.push(self.key_value("Inline:", if module.is_inline { "yes" } else { "no" }.to_string()));
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("mod ", self.theme.style_keyword()),
+                Span::styled(
+                    module.name.clone(),
+                    self.theme
+                        .style_accent_bold()
+                        .add_modifier(Modifier::UNDERLINED),
+                ),
+            ]),
+            Line::from(""),
+            self.section_header("Overview"),
+            Line::from(""),
+            self.key_value("Visibility:", module.visibility.to_string()),
+            self.key_value("Path:", module.path.clone()),
+            self.key_value(
+                "Inline:",
+                if module.is_inline { "yes" } else { "no" }.to_string(),
+            ),
+        ];
 
         // Submodules (flow / tree)
         if !module.submodules.is_empty() {
             lines.push(Line::from(""));
-            lines.push(self.section_header(&format!("Submodules / flow ({})", module.submodules.len())));
+            lines.push(
+                self.section_header(&format!("Submodules / flow ({})", module.submodules.len())),
+            );
             lines.push(Line::from(""));
             let n = module.submodules.len();
             for (i, submod) in module.submodules.iter().enumerate() {
-                let connector = if i == n - 1 { "└── " } else { "├── " };
+                let connector = if i == n - 1 {
+                    "└── "
+                } else {
+                    "├── "
+                };
                 lines.push(Line::from(vec![
                     Span::raw("  "),
                     Span::styled(connector, self.theme.style_muted()),
@@ -971,7 +1084,10 @@ impl<'a> InspectorPanel<'a> {
             if module.items.len() > 20 {
                 lines.push(Line::from(vec![
                     Span::raw("  "),
-                    Span::styled(format!("... and {} more", module.items.len() - 20), self.theme.style_muted()),
+                    Span::styled(
+                        format!("... and {} more", module.items.len() - 20),
+                        self.theme.style_muted(),
+                    ),
                 ]));
             }
         }
@@ -994,21 +1110,25 @@ impl<'a> InspectorPanel<'a> {
     }
 
     fn render_type_alias(&self, alias: &TypeAliasInfo, area: Rect, buf: &mut Buffer) {
-        let mut lines = Vec::new();
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("type ", self.theme.style_keyword()),
+                Span::styled(
+                    alias.name.clone(),
+                    self.theme
+                        .style_accent_bold()
+                        .add_modifier(Modifier::UNDERLINED),
+                ),
+                Span::styled(" = ", self.theme.style_muted()),
+                Span::styled(alias.ty.clone(), self.theme.style_type()),
+            ]),
+            Line::from(""),
+            self.section_header("Overview"),
+            Line::from(""),
+            self.key_value("Visibility:", alias.visibility.to_string()),
+            self.key_value("Aliased Type:", alias.ty.clone()),
+        ];
 
-        lines.push(Line::from(vec![
-            Span::styled("type ", self.theme.style_keyword()),
-            Span::styled(alias.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)),
-            Span::styled(" = ", self.theme.style_muted()),
-            Span::styled(alias.ty.clone(), self.theme.style_type()),
-        ]));
-        lines.push(Line::from(""));
-
-        lines.push(self.section_header("Overview"));
-        lines.push(Line::from(""));
-        lines.push(self.key_value("Visibility:", alias.visibility.to_string()));
-        lines.push(self.key_value("Aliased Type:", alias.ty.clone()));
-        
         if !alias.generics.is_empty() {
             lines.push(self.key_value("Generics:", format!("<{}>", alias.generics.join(", "))));
         }
@@ -1030,21 +1150,25 @@ impl<'a> InspectorPanel<'a> {
     }
 
     fn render_const(&self, c: &ConstInfo, area: Rect, buf: &mut Buffer) {
-        let mut lines = Vec::new();
+        let mut lines = vec![
+            Line::from(vec![
+                Span::styled("const ", self.theme.style_keyword()),
+                Span::styled(
+                    c.name.clone(),
+                    self.theme
+                        .style_accent_bold()
+                        .add_modifier(Modifier::UNDERLINED),
+                ),
+                Span::styled(": ", self.theme.style_muted()),
+                Span::styled(c.ty.clone(), self.theme.style_type()),
+            ]),
+            Line::from(""),
+            self.section_header("Overview"),
+            Line::from(""),
+            self.key_value("Visibility:", c.visibility.to_string()),
+            self.key_value("Type:", c.ty.clone()),
+        ];
 
-        lines.push(Line::from(vec![
-            Span::styled("const ", self.theme.style_keyword()),
-            Span::styled(c.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)),
-            Span::styled(": ", self.theme.style_muted()),
-            Span::styled(c.ty.clone(), self.theme.style_type()),
-        ]));
-        lines.push(Line::from(""));
-
-        lines.push(self.section_header("Overview"));
-        lines.push(Line::from(""));
-        lines.push(self.key_value("Visibility:", c.visibility.to_string()));
-        lines.push(self.key_value("Type:", c.ty.clone()));
-        
         if let Some(ref value) = c.value {
             lines.push(self.key_value("Value:", value.clone()));
         }
@@ -1068,15 +1192,18 @@ impl<'a> InspectorPanel<'a> {
     fn render_static(&self, s: &StaticInfo, area: Rect, buf: &mut Buffer) {
         let mut lines = Vec::new();
 
-        let mut header = vec![
-            Span::styled("static ", self.theme.style_keyword()),
-        ];
-        
+        let mut header = vec![Span::styled("static ", self.theme.style_keyword())];
+
         if s.is_mut {
             header.push(Span::styled("mut ", self.theme.style_keyword()));
         }
-        
-        header.push(Span::styled(s.name.clone(), self.theme.style_accent_bold().add_modifier(Modifier::UNDERLINED)));
+
+        header.push(Span::styled(
+            s.name.clone(),
+            self.theme
+                .style_accent_bold()
+                .add_modifier(Modifier::UNDERLINED),
+        ));
         header.push(Span::styled(": ", self.theme.style_muted()));
         header.push(Span::styled(s.ty.clone(), self.theme.style_type()));
 
@@ -1091,7 +1218,10 @@ impl<'a> InspectorPanel<'a> {
         lines.push(Line::from(""));
         lines.push(self.key_value("Visibility:", s.visibility.to_string()));
         lines.push(self.key_value("Type:", s.ty.clone()));
-        lines.push(self.key_value("Mutable:", if s.is_mut { "yes ⚠️" } else { "no" }.to_string()));
+        lines.push(self.key_value(
+            "Mutable:",
+            if s.is_mut { "yes ⚠️" } else { "no" }.to_string(),
+        ));
 
         if s.is_mut {
             lines.push(Line::from(""));
@@ -1135,10 +1265,7 @@ impl<'a> InspectorPanel<'a> {
         block.render(area, buf);
 
         // Apply scroll offset
-        let visible_lines: Vec<Line> = lines
-            .into_iter()
-            .skip(self.scroll_offset)
-            .collect();
+        let visible_lines: Vec<Line> = lines.into_iter().skip(self.scroll_offset).collect();
 
         Paragraph::new(visible_lines)
             .wrap(Wrap { trim: false })
@@ -1149,10 +1276,9 @@ impl<'a> InspectorPanel<'a> {
             let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
                 .begin_symbol(Some("↑"))
                 .end_symbol(Some("↓"));
-            
-            let mut scrollbar_state = ScrollbarState::new(total_lines)
-                .position(self.scroll_offset);
-            
+
+            let mut scrollbar_state = ScrollbarState::new(total_lines).position(self.scroll_offset);
+
             scrollbar.render(inner, buf, &mut scrollbar_state);
         }
     }

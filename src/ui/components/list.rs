@@ -109,7 +109,11 @@ pub fn highlight_fuzzy_match<'a>(text: &'a str, query: &str, theme: &Theme) -> L
         if idx > last_end {
             spans.push(Span::raw(text[last_end..idx].to_string()));
         }
-        let char_len = text[idx..].chars().next().map(|c| c.len_utf8()).unwrap_or(1);
+        let char_len = text[idx..]
+            .chars()
+            .next()
+            .map(|c| c.len_utf8())
+            .unwrap_or(1);
         spans.push(Span::styled(
             text[idx..idx + char_len].to_string(),
             Style::default()

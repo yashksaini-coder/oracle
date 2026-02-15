@@ -211,3 +211,38 @@ impl DependencyAnalyzer {
             .collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+
+    #[test]
+    fn test_dependency_tree_from_manifest() {
+        // Run from crate root: Cargo.toml exists
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+        if !manifest.exists() {
+            return;
+        }
+        let analyzer = DependencyAnalyzer::from_manifest(&manifest).unwrap();
+        let root = analyzer.root_package().expect("root package");
+        assert_eq!(root.name, "oracle");
+        let tree = analyzer.dependency_tree(&root.name);
+        assert!(!tree.is_empty());
+        assert_eq!(tree[0].0, root.name);
+        assert_eq!(tree[0].1, 0);
+    }
+
+    #[test]
+    fn test_direct_dependencies() {
+        let manifest = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+        if !manifest.exists() {
+            return;
+        }
+        let analyzer = DependencyAnalyzer::from_manifest(&manifest).unwrap();
+        let root = analyzer.root_package().unwrap();
+        let deps = analyzer.direct_dependencies(&root.name);
+        // Oracle has at least ratatui, crossterm, etc.
+        assert!(deps.iter().any(|d| d.name == "ratatui" || d.name == "crossterm"));
+    }
+}

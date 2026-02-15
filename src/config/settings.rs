@@ -97,3 +97,28 @@ impl Settings {
         Ok(config_dir.join("oracle").join("config.yaml"))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_settings_default() {
+        let s = Settings::default();
+        assert_eq!(s.ui.theme, "default");
+        assert!(s.ui.show_line_numbers);
+        assert_eq!(s.keybindings.quit, "q");
+        assert_eq!(s.keybindings.search, "/");
+        assert!(s.analyzer.include_private);
+        assert_eq!(s.analyzer.max_depth, 10);
+    }
+
+    #[test]
+    fn test_settings_roundtrip_yaml() {
+        let s = Settings::default();
+        let yaml = serde_yaml::to_string(&s).unwrap();
+        let loaded: Settings = serde_yaml::from_str(&yaml).unwrap();
+        assert_eq!(s.ui.theme, loaded.ui.theme);
+        assert_eq!(s.keybindings.quit, loaded.keybindings.quit);
+    }
+}

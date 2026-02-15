@@ -1,16 +1,18 @@
 //! User interface module
 
-pub mod components;
-pub mod theme;
-pub mod app;
-pub mod search;
-pub mod inspector;
-pub mod dependency_view;
 pub mod animation;
+pub mod app;
+pub mod components;
+pub mod dependency_view;
+pub mod inspector;
+pub mod search;
 pub mod splash;
+pub mod theme;
 
-pub use app::{OracleUi, Tab, Focus};
-pub use search::{SearchBar, SearchCompletion, CompletionCandidate, CandidateKind, filter_candidates};
-pub use inspector::InspectorPanel;
+pub use animation::{AnimationState, Easing, SmoothScroll};
+pub use app::{Focus, OracleUi, Tab};
 pub use dependency_view::DependencyView;
-pub use animation::{AnimationState, SmoothScroll, Easing};
+pub use inspector::InspectorPanel;
+pub use search::{
+    filter_candidates, CandidateKind, CompletionCandidate, SearchBar, SearchCompletion,
+};
