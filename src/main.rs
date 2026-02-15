@@ -272,9 +272,33 @@ fn handle_key_event(
 ) {
     use oracle_lib::ui::app::Tab;
 
-    // When Copilot chat panel is open, all typing goes to chat first (no command stealing)
+    // When Copilot chat panel is open: PgDn/PgUp/arrows/Home/End always scroll the chat (no need to focus chat first)
     if app.copilot_chat_open {
         match code {
+            KeyCode::PageDown => {
+                app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_add(10);
+                return;
+            }
+            KeyCode::PageUp => {
+                app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_sub(10);
+                return;
+            }
+            KeyCode::Down => {
+                app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_add(1);
+                return;
+            }
+            KeyCode::Up => {
+                app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_sub(1);
+                return;
+            }
+            KeyCode::Home => {
+                app.copilot_chat_scroll = 0;
+                return;
+            }
+            KeyCode::End => {
+                app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_add(9999);
+                return;
+            }
             KeyCode::Char(c) => {
                 if modifiers == KeyModifiers::SHIFT && c == 'C' {
                     // Let Shift+C fall through to toggle panel

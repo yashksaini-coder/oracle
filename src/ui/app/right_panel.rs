@@ -364,14 +364,21 @@ impl<'a> OracleUi<'a> {
         let max_scroll = total_lines.saturating_sub(visible_height).max(0);
         let scroll = self.copilot_chat_scroll.min(max_scroll);
 
+        // Line-based scroll: slice the content (like inspector) so scroll is in line units, not rows.
+        // Paragraph::scroll() uses row offset which breaks when lines wrap.
         let content_area = Rect {
             width: messages_area.width.saturating_sub(1),
             ..messages_area
         };
-        let paragraph = Paragraph::new(lines.clone())
+        let visible_lines: Vec<Line<'_>> = lines
+            .iter()
+            .skip(scroll)
+            .take(visible_height)
+            .cloned()
+            .collect();
+        Paragraph::new(visible_lines)
             .wrap(Wrap { trim: false })
-            .scroll((0, scroll as u16));
-        paragraph.render(content_area, buf);
+            .render(content_area, buf);
 
         if total_lines > visible_height {
             let scrollbar_area = Rect {
@@ -389,6 +396,7 @@ impl<'a> OracleUi<'a> {
             scrollbar.render(scrollbar_area, buf, &mut scrollbar_state);
         }
 
+        // Input row: distinct background so the input area is clearly visible
         let input_display: &str = if self.copilot_chat_input.is_empty() {
             "Ask about this item… (Enter to send, Esc to close)"
         } else {
@@ -399,10 +407,15 @@ impl<'a> OracleUi<'a> {
         } else {
             self.theme.style_muted()
         };
+        let input_block = Block::default()
+            .borders(Borders::NONE)
+            .style(Style::default().bg(self.theme.bg_highlight));
+        let input_inner = input_block.inner(input_area);
+        input_block.render(input_area, buf);
         let input_line = Paragraph::new(Line::from(vec![
             Span::styled(" ▸ ", self.theme.style_dim()),
             Span::styled(input_display, input_style),
         ]));
-        input_line.render(input_area, buf);
+        input_line.render(input_inner, buf);
     }
 }
