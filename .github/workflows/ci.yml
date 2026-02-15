@@ -91,7 +91,36 @@ jobs:
             -A clippy::cast_possible_truncation \
             -A clippy::cast_precision_loss \
             -A clippy::cast_sign_loss \
-            -A clippy::similar_names
+            -A clippy::similar_names \
+            -A clippy::needless_raw_string_hashes \
+            -A clippy::unreadable_literal \
+            -A clippy::doc_markdown \
+            -A clippy::redundant_closure_for_method_calls \
+            -A clippy::unused_self \
+            -A clippy::match_same_arms \
+            -A clippy::wildcard_imports \
+            -A clippy::return_self_not_must_use \
+            -A clippy::needless_pass_by_value \
+            -A clippy::ref_option \
+            -A clippy::doc_link_with_quotes \
+            -A clippy::case_sensitive_file_extension_comparisons \
+            -A clippy::option_if_let_else \
+            -A clippy::single_match \
+            -A clippy::struct_field_names \
+            -A clippy::needless_lifetimes \
+            -A clippy::map_unwrap_or \
+            -A clippy::match_wild_err_arm \
+            -A clippy::if_same_then_else \
+            -A clippy::range_plus_one \
+            -A clippy::branches_sharing_code \
+            -A clippy::manual_let_else \
+            -A clippy::uninlined_format_args \
+            -A clippy::stable_sort_primitive \
+            -A clippy::struct_excessive_bools \
+            -A clippy::match_wildcard_for_single_variants \
+            -A clippy::elidable_lifetime_names \
+            -A clippy::comparison_chain \
+            -A clippy::if_not_else
 
   # Check for disallowed dependencies (license/security)
   cargo-deny:

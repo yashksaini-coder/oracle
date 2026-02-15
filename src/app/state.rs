@@ -173,10 +173,13 @@ impl App {
         let analyzer = RustAnalyzer::new().with_private(self.settings.analyzer.include_private);
 
         let src_path = path.join("src");
-        if src_path.exists() {
-            self.analyze_directory(&analyzer, &src_path)?;
-        } else if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
+        if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
             self.items = analyzer.analyze_file(path)?;
+        } else if src_path.exists() {
+            self.analyze_directory(&analyzer, &src_path)?;
+        } else if path.is_dir() {
+            // No src/ (e.g. flat layout): analyze directory for .rs files
+            self.analyze_directory(&analyzer, &path.to_path_buf())?;
         }
 
         self.update_candidates();
