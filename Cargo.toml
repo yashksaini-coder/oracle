@@ -35,8 +35,8 @@ proc-macro2 = { version = "1.0", features = ["span-locations"] }
 cargo_metadata = "0.19"
 toml = "0.8"
 
-# HTTP Client for crates.io
-reqwest = { version = "0.12", features = ["json"] }
+# HTTP Client for crates.io (blocking for background fetch thread)
+reqwest = { version = "0.12", features = ["json", "blocking"] }
 
 # Configuration & Serialization
 serde = { version = "1", features = ["derive"] }
@@ -53,6 +53,8 @@ fuzzy-matcher = "0.3"
 # Utilities
 unicode-width = "0.2"
 dirs = "6"
+webbrowser = "0.8"
+dotenvy = "0.15"
 
 # Dependency graph visualization
 petgraph = "0.8"

@@ -16,13 +16,16 @@ use ratatui::{backend::CrosstermBackend, Terminal};
 use std::{env, io, path::PathBuf, time::Duration};
 
 fn main() -> Result<()> {
-    // Parse command line args
+    // Load .env so GITHUB_TOKEN etc. are available (cwd first, then project path overrides)
+    let _ = dotenvy::dotenv();
     let args: Vec<String> = env::args().collect();
-    let project_path = if args.len() > 1 {
-        PathBuf::from(&args[1])
-    } else {
-        env::current_dir()?
-    };
+    let project_path = args
+        .iter()
+        .skip(1)
+        .find(|a| !a.starts_with('-'))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| env::current_dir().unwrap_or(PathBuf::from(".")));
+    let _ = dotenvy::from_path(project_path.join(".env"));
 
     // Initialize terminal
     enable_raw_mode()?;
@@ -30,6 +33,9 @@ fn main() -> Result<()> {
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
+
+    // Splash screen with waves animation (skip with any key)
+    let _ = oracle_lib::ui::splash::run_splash(&mut terminal);
 
     // Create and run app
     let mut app = App::new();
@@ -77,26 +83,42 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
             last_selected = current_selected;
         }
 
+        // Poll crate docs channel and maybe start fetch for selected dependency
+        app.poll_crate_docs_rx();
+        app.maybe_start_crate_doc_fetch();
+
         // Draw UI
+        let selected_dep_name = app.selected_dependency_name();
+        let crate_doc = selected_dep_name.as_ref().and_then(|n| app.crate_docs_cache.get(n));
+        let crate_doc_loading = app.crate_docs_loading.as_deref() == selected_dep_name.as_deref();
+        let crate_doc_failed = selected_dep_name.as_ref().map_or(false, |n| app.crate_docs_failed.contains(n));
         terminal.draw(|frame| {
             let filtered = app.get_filtered_items();
             let selected = app.list_state.selected();
-            
-            // Get installed crate items if viewing a crate
-            let installed_items: Vec<&oracle_lib::analyzer::AnalyzedItem> = 
+
+            let installed_items: Vec<&oracle_lib::analyzer::AnalyzedItem> =
                 app.installed_crate_filtered
                     .iter()
                     .filter_map(|&i| app.installed_crate_items.get(i))
                     .collect();
 
+            let all_items_impl = if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
+                Some(app.installed_crate_items.as_slice())
+            } else {
+                Some(app.items.as_slice())
+            };
             let ui = OracleUi::new(&app.theme)
                 .items(&app.items)
+                .all_items_impl_lookup(all_items_impl)
                 .filtered_items(&filtered)
                 .list_selected(selected)
                 .candidates(&app.filtered_candidates)
                 .crate_info(app.crate_info.as_ref())
                 .dependency_tree(&app.dependency_tree)
-                .installed_crates(&app.installed_crates_list)
+                .filtered_dependency_indices(&app.filtered_dependency_indices)
+                .crate_doc(crate_doc)
+                .crate_doc_loading(crate_doc_loading)
+                .crate_doc_failed(crate_doc_failed)
                 .selected_installed_crate(app.selected_installed_crate.as_ref())
                 .installed_crate_items(&installed_items)
                 .search_input(&app.search_input)
@@ -106,6 +128,7 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                 .completion_selected(app.completion_selected)
                 .show_completion(app.show_completion)
                 .show_help(app.show_help)
+                .show_settings(app.show_settings)
                 .status_message(&app.status_message)
                 .inspector_scroll(inspector_scroll)
                 .animation_state(&animation);
@@ -144,7 +167,7 @@ fn handle_key_event(
     animation: &mut AnimationState,
 ) {
     use oracle_lib::ui::app::Tab;
-    
+
     // Global shortcuts
     match code {
         KeyCode::Char('q') if modifiers.is_empty() && app.focus != Focus::Search => {
@@ -155,13 +178,22 @@ fn handle_key_event(
             app.toggle_help();
             return;
         }
+        KeyCode::Char('t') if modifiers.is_empty() && app.focus != Focus::Search => {
+            app.cycle_theme();
+            return;
+        }
+        KeyCode::Char('S') if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search => {
+            app.toggle_settings();
+            return;
+        }
         KeyCode::Esc => {
-            if app.show_help {
+            if app.show_settings {
+                app.toggle_settings();
+            } else if app.show_help {
                 app.show_help = false;
             } else if app.show_completion {
                 app.show_completion = false;
-            } else if app.current_tab == Tab::InstalledCrates && app.selected_installed_crate.is_some() {
-                // Go back to crate list
+            } else if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
                 app.clear_installed_crate();
             } else if !app.search_input.is_empty() {
                 app.clear_search();
@@ -171,6 +203,14 @@ fn handle_key_event(
             return;
         }
         _ => {}
+    }
+
+    // Settings overlay: t cycle theme
+    if app.show_settings {
+        if let KeyCode::Char('t') = code {
+            app.cycle_theme();
+        }
+        return;
     }
 
     // Help is open - any key closes it
@@ -203,14 +243,7 @@ fn handle_key_event(
             return;
         }
         KeyCode::Char('4') if modifiers.is_empty() && app.focus != Focus::Search => {
-            app.current_tab = Tab::Dependencies;
-            app.list_state.select(Some(0));
-            app.filter_items();
-            animation.on_tab_change();
-            return;
-        }
-        KeyCode::Char('5') if modifiers.is_empty() && app.focus != Focus::Search => {
-            app.current_tab = Tab::InstalledCrates;
+            app.current_tab = Tab::Crates;
             app.list_state.select(Some(0));
             if app.installed_crates_list.is_empty() {
                 let _ = app.scan_installed_crates();
@@ -250,22 +283,22 @@ fn handle_search_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
                 app.prev_completion();
             }
         }
-        KeyCode::Tab if modifiers.is_empty() => {
-            if app.show_completion {
-                app.select_completion();
+        KeyCode::Tab | KeyCode::BackTab if modifiers.is_empty() => {
+            if code == KeyCode::Tab {
+                if app.show_completion {
+                    app.select_completion();
+                }
+                app.next_focus(); // Tab: search -> list -> inspector
             } else {
-                app.next_focus();
+                app.prev_focus(); // BackTab: search -> inspector -> list
             }
-        }
-        KeyCode::BackTab => {
-            app.prev_focus();
         }
         KeyCode::Enter => {
             if app.show_completion {
                 app.select_completion();
             } else {
-                // For Crates tab, try qualified path search
-                if app.current_tab == Tab::InstalledCrates {
+                // Dependencies tab (inside a crate): try qualified path search
+                if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
                     app.search_qualified_path();
                 }
                 app.filter_items();
@@ -296,29 +329,40 @@ fn handle_list_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
             app.focus = Focus::Search;
         }
         KeyCode::Enter | KeyCode::Right | KeyCode::Char('l') => {
-            // Handle installed crates specially
-            if app.current_tab == Tab::InstalledCrates && app.selected_installed_crate.is_none() {
-                // Select a crate from the list
-                if let Some(idx) = app.list_state.selected() {
-                    // Filter the list like we do in UI
-                    let query = app.search_input.to_lowercase();
-                    let crate_name: Option<String> = app.installed_crates_list.iter()
-                        .filter(|name| query.is_empty() || name.to_lowercase().contains(&query))
-                        .nth(idx)
-                        .cloned();
-                    
-                    if let Some(name) = crate_name {
+            // Dependencies: Enter on a dep opens that crate's items (from registry)
+            if app.current_tab == Tab::Crates && app.selected_installed_crate.is_none() {
+                if let Some(name) = app.selected_dependency_name() {
+                    if app.dependency_root_name().as_deref() != Some(name.as_str()) {
                         let _ = app.select_installed_crate(&name);
                         app.list_state.select(Some(0));
+                    } else {
+                        app.focus = Focus::Inspector;
                     }
+                } else {
+                    app.focus = Focus::Inspector;
                 }
             } else {
                 app.focus = Focus::Inspector;
             }
         }
+        KeyCode::Char('o') | KeyCode::Char('c') if modifiers.is_empty() => {
+            if app.current_tab == Tab::Crates {
+                if let Some(name) = app.selected_crate_name_for_display() {
+                    let url = if code == KeyCode::Char('c') {
+                        format!("https://crates.io/crates/{}", name)
+                    } else {
+                        format!("https://docs.rs/{}", name)
+                    };
+                    if webbrowser::open(&url).is_ok() {
+                        app.status_message = format!("Opened {} in browser", name);
+                    } else {
+                        app.status_message = format!("Failed to open {}", url);
+                    }
+                }
+            }
+        }
         KeyCode::Left | KeyCode::Char('h') => {
-            // Go back in installed crates
-            if app.current_tab == Tab::InstalledCrates && app.selected_installed_crate.is_some() {
+            if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
                 app.clear_installed_crate();
             } else {
                 app.focus = Focus::Search;
@@ -385,6 +429,22 @@ fn handle_inspector_input(
         }
         KeyCode::Home | KeyCode::Char('g') => {
             *inspector_scroll = 0;
+        }
+        KeyCode::Char('o') | KeyCode::Char('c') if modifiers.is_empty() => {
+            if app.current_tab == Tab::Crates {
+                if let Some(name) = app.selected_crate_name_for_display() {
+                    let url = if code == KeyCode::Char('c') {
+                        format!("https://crates.io/crates/{}", name)
+                    } else {
+                        format!("https://docs.rs/{}", name)
+                    };
+                    if webbrowser::open(&url).is_ok() {
+                        app.status_message = format!("Opened {} in browser", name);
+                    } else {
+                        app.status_message = format!("Failed to open {}", url);
+                    }
+                }
+            }
         }
         _ => {}
     }

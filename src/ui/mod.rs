@@ -7,6 +7,7 @@ pub mod search;
 pub mod inspector;
 pub mod dependency_view;
 pub mod animation;
+pub mod splash;
 
 pub use app::{OracleUi, Tab, Focus};
 pub use search::{SearchBar, SearchCompletion, CompletionCandidate, CandidateKind, filter_candidates};

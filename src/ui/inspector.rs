@@ -5,7 +5,10 @@ use ratatui::{
     layout::Rect,
     style::Modifier,
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap},
+    widgets::{
+        block::BorderType,
+        Block, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap,
+    },
 };
 
 use crate::analyzer::{
@@ -17,6 +20,8 @@ use crate::ui::theme::Theme;
 /// Panel for inspecting code items with scrolling support
 pub struct InspectorPanel<'a> {
     item: Option<&'a AnalyzedItem>,
+    /// All items (for "Implementations" of a trait)
+    all_items: Option<&'a [AnalyzedItem]>,
     theme: &'a Theme,
     focused: bool,
     scroll_offset: usize,
@@ -26,6 +31,7 @@ impl<'a> InspectorPanel<'a> {
     pub fn new(theme: &'a Theme) -> Self {
         Self {
             item: None,
+            all_items: None,
             theme,
             focused: false,
             scroll_offset: 0,
@@ -34,6 +40,11 @@ impl<'a> InspectorPanel<'a> {
 
     pub fn item(mut self, item: Option<&'a AnalyzedItem>) -> Self {
         self.item = item;
+        self
+    }
+
+    pub fn all_items(mut self, items: Option<&'a [AnalyzedItem]>) -> Self {
+        self.all_items = items;
         self
     }
 
@@ -49,9 +60,9 @@ impl<'a> InspectorPanel<'a> {
 
     fn section_header(&self, title: &str) -> Line<'static> {
         Line::from(vec![
-            Span::styled("━━━ ", self.theme.style_muted()),
-            Span::styled(title.to_string(), self.theme.style_accent()),
-            Span::styled(" ━━━", self.theme.style_muted()),
+            Span::styled("▸ ", self.theme.style_accent()),
+            Span::styled(title.to_string(), self.theme.style_accent().add_modifier(Modifier::BOLD)),
+            Span::styled(" ─────────────────", self.theme.style_muted()),
         ])
     }
 
@@ -74,8 +85,9 @@ impl<'a> InspectorPanel<'a> {
     fn render_empty(&self, area: Rect, buf: &mut Buffer) {
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(self.theme.style_border())
-            .title(" 🔍 Inspector ");
+            .title(" ◇ Inspector ");
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -741,6 +753,38 @@ impl<'a> InspectorPanel<'a> {
             }
         }
 
+        // Implementations (impl Trait for Type)
+        if let Some(all) = self.all_items {
+            let impls: Vec<&ImplInfo> = all
+                .iter()
+                .filter_map(|i| {
+                    if let AnalyzedItem::Impl(im) = i {
+                        let matches = im.trait_name.as_deref().map_or(false, |tn| {
+                            tn == tr.name || tn.ends_with(&format!("::{}", tr.name))
+                        });
+                        if matches {
+                            Some(im)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            if !impls.is_empty() {
+                lines.push(Line::from(""));
+                lines.push(self.section_header(&format!("Implementations ({})", impls.len())));
+                lines.push(Line::from(""));
+                for (i, im) in impls.iter().enumerate() {
+                    lines.push(Line::from(vec![
+                        Span::styled(format!("  {}. ", i + 1), self.theme.style_dim()),
+                        Span::styled(im.full_definition(), self.theme.style_type()),
+                    ]));
+                }
+            }
+        }
+
         // Methods
         if !tr.methods.is_empty() {
             lines.push(Line::from(""));
@@ -897,14 +941,17 @@ impl<'a> InspectorPanel<'a> {
         lines.push(self.key_value("Path:", module.path.clone()));
         lines.push(self.key_value("Inline:", if module.is_inline { "yes" } else { "no" }.to_string()));
 
-        // Submodules
+        // Submodules (flow / tree)
         if !module.submodules.is_empty() {
             lines.push(Line::from(""));
-            lines.push(self.section_header(&format!("Submodules ({})", module.submodules.len())));
+            lines.push(self.section_header(&format!("Submodules / flow ({})", module.submodules.len())));
             lines.push(Line::from(""));
-            for submod in &module.submodules {
+            let n = module.submodules.len();
+            for (i, submod) in module.submodules.iter().enumerate() {
+                let connector = if i == n - 1 { "└── " } else { "├── " };
                 lines.push(Line::from(vec![
-                    Span::raw("  • "),
+                    Span::raw("  "),
+                    Span::styled(connector, self.theme.style_muted()),
                     Span::styled(submod.clone(), self.theme.style_accent()),
                 ]));
             }
@@ -1073,9 +1120,10 @@ impl<'a> InspectorPanel<'a> {
 
     fn render_panel(&self, title: &str, lines: Vec<Line<'static>>, area: Rect, buf: &mut Buffer) {
         let total_lines = lines.len();
-        
+
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
             .border_style(if self.focused {
                 self.theme.style_border_focused()
             } else {

@@ -2,11 +2,12 @@
 
 use crate::analyzer::AnalyzedItem;
 use crate::analyzer::CrateInfo;
+use crate::crates_io::CrateDocInfo;
 use crate::ui::animation::AnimationState;
+use crate::ui::dependency_view::{self, DependencyDocView, DependencyView};
 use crate::ui::components::TabBar;
 use crate::ui::search::{CompletionCandidate, SearchBar, SearchCompletion};
 use crate::ui::inspector::InspectorPanel;
-use crate::ui::dependency_view::DependencyView;
 use crate::ui::theme::Theme;
 
 use ratatui::{
@@ -14,23 +15,22 @@ use ratatui::{
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Clear, Paragraph, Widget},
+    widgets::{Block, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget},
 };
 
-/// Active tab in the UI
+/// Active tab in the UI (Crates = project crates from Cargo.toml + open crate items)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Tab {
     #[default]
     Types,
     Functions,
     Modules,
-    Dependencies,
-    InstalledCrates,
+    Crates,
 }
 
 impl Tab {
     pub fn all() -> &'static [Tab] {
-        &[Tab::Types, Tab::Functions, Tab::Modules, Tab::Dependencies, Tab::InstalledCrates]
+        &[Tab::Types, Tab::Functions, Tab::Modules, Tab::Crates]
     }
 
     pub fn title(&self) -> &'static str {
@@ -38,8 +38,7 @@ impl Tab {
             Tab::Types => "Types",
             Tab::Functions => "Functions",
             Tab::Modules => "Modules",
-            Tab::Dependencies => "Dependencies",
-            Tab::InstalledCrates => "Crates",
+            Tab::Crates => "Crates",
         }
     }
 
@@ -48,18 +47,16 @@ impl Tab {
             Tab::Types => 0,
             Tab::Functions => 1,
             Tab::Modules => 2,
-            Tab::Dependencies => 3,
-            Tab::InstalledCrates => 4,
+            Tab::Crates => 3,
         }
     }
 
     pub fn from_index(index: usize) -> Self {
-        match index % 5 {
+        match index % 4 {
             0 => Tab::Types,
             1 => Tab::Functions,
             2 => Tab::Modules,
-            3 => Tab::Dependencies,
-            _ => Tab::InstalledCrates,
+            _ => Tab::Crates,
         }
     }
 
@@ -68,7 +65,7 @@ impl Tab {
     }
 
     pub fn prev(&self) -> Self {
-        Self::from_index(self.index().wrapping_sub(1).min(4))
+        Self::from_index(self.index().wrapping_sub(1).min(3))
     }
 }
 
@@ -103,13 +100,20 @@ impl Focus {
 pub struct OracleUi<'a> {
     // Data
     items: &'a [AnalyzedItem],
+    /// Full list for impl lookup (project items or installed crate items)
+    all_items_impl_lookup: Option<&'a [AnalyzedItem]>,
     filtered_items: &'a [&'a AnalyzedItem],
     candidates: &'a [CompletionCandidate],
     crate_info: Option<&'a CrateInfo>,
     dependency_tree: &'a [(String, usize)],
+    /// Indices into dependency_tree for current search filter (Crates tab, top level). Empty = show all.
+    filtered_dependency_indices: &'a [usize],
+    /// Fetched doc for selected crate (when not root, not inside a crate)
+    crate_doc: Option<&'a CrateDocInfo>,
+    crate_doc_loading: bool,
+    crate_doc_failed: bool,
 
-    // Installed crates data
-    installed_crates: &'a [String],
+    // Crates tab: when Enter on a crate, we show that crate's items
     selected_installed_crate: Option<&'a crate::analyzer::InstalledCrate>,
     installed_crate_items: &'a [&'a AnalyzedItem],
 
@@ -122,6 +126,7 @@ pub struct OracleUi<'a> {
     completion_selected: usize,
     show_completion: bool,
     show_help: bool,
+    show_settings: bool,
     status_message: &'a str,
     inspector_scroll: usize,
 
@@ -136,11 +141,15 @@ impl<'a> OracleUi<'a> {
     pub fn new(theme: &'a Theme) -> Self {
         Self {
             items: &[],
+            all_items_impl_lookup: None,
             filtered_items: &[],
             candidates: &[],
             crate_info: None,
             dependency_tree: &[],
-            installed_crates: &[],
+            filtered_dependency_indices: &[],
+            crate_doc: None,
+            crate_doc_loading: false,
+            crate_doc_failed: false,
             selected_installed_crate: None,
             installed_crate_items: &[],
             search_input: "",
@@ -151,6 +160,7 @@ impl<'a> OracleUi<'a> {
             completion_selected: 0,
             show_completion: false,
             show_help: false,
+            show_settings: false,
             status_message: "",
             inspector_scroll: 0,
             animation: None,
@@ -163,13 +173,13 @@ impl<'a> OracleUi<'a> {
         self
     }
 
-    pub fn filtered_items(mut self, items: &'a [&'a AnalyzedItem]) -> Self {
-        self.filtered_items = items;
+    pub fn all_items_impl_lookup(mut self, items: Option<&'a [AnalyzedItem]>) -> Self {
+        self.all_items_impl_lookup = items;
         self
     }
 
-    pub fn installed_crates(mut self, crates: &'a [String]) -> Self {
-        self.installed_crates = crates;
+    pub fn filtered_items(mut self, items: &'a [&'a AnalyzedItem]) -> Self {
+        self.filtered_items = items;
         self
     }
 
@@ -200,6 +210,26 @@ impl<'a> OracleUi<'a> {
 
     pub fn dependency_tree(mut self, tree: &'a [(String, usize)]) -> Self {
         self.dependency_tree = tree;
+        self
+    }
+
+    pub fn filtered_dependency_indices(mut self, indices: &'a [usize]) -> Self {
+        self.filtered_dependency_indices = indices;
+        self
+    }
+
+    pub fn crate_doc(mut self, doc: Option<&'a CrateDocInfo>) -> Self {
+        self.crate_doc = doc;
+        self
+    }
+
+    pub fn crate_doc_loading(mut self, loading: bool) -> Self {
+        self.crate_doc_loading = loading;
+        self
+    }
+
+    pub fn crate_doc_failed(mut self, failed: bool) -> Self {
+        self.crate_doc_failed = failed;
         self
     }
 
@@ -238,6 +268,11 @@ impl<'a> OracleUi<'a> {
         self
     }
 
+    pub fn show_settings(mut self, show: bool) -> Self {
+        self.show_settings = show;
+        self
+    }
+
     pub fn status_message(mut self, msg: &'a str) -> Self {
         self.status_message = msg;
         self
@@ -263,16 +298,14 @@ impl<'a> OracleUi<'a> {
             "╚██████╔╝██║  ██║██║  ██║╚██████╗███████╗███████╗",
             " ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝╚══════╝╚══════╝",
         ];
-        
+
         let crate_name = self.crate_info
             .map(|c| c.name.as_str())
             .unwrap_or("oracle");
-        
         let version = self.crate_info
             .map(|c| format!("v{}", c.version))
             .unwrap_or_else(|| "v0.1.0".to_string());
 
-        // For smaller terminals, use compact header
         if area.height < 5 {
             let title = Line::from(vec![
                 Span::styled("🔮 ", Style::default()),
@@ -291,7 +324,6 @@ impl<'a> OracleUi<'a> {
             return;
         }
 
-        // Render banner art on left, info on right
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
@@ -300,15 +332,12 @@ impl<'a> OracleUi<'a> {
             ])
             .split(area);
 
-        // Banner with gradient effect
-        let banner_lines: Vec<Line> = banner.iter()
+        let banner_lines: Vec<Line> = banner
+            .iter()
             .map(|line| Line::from(Span::styled(*line, self.theme.style_accent())))
             .collect();
-        
-        let banner_widget = Paragraph::new(banner_lines);
-        banner_widget.render(chunks[0], buf);
+        Paragraph::new(banner_lines).render(chunks[0], buf);
 
-        // Info panel on right
         let info_lines = vec![
             Line::from(""),
             Line::from(vec![
@@ -329,9 +358,7 @@ impl<'a> OracleUi<'a> {
                 Span::styled(" switch", self.theme.style_dim()),
             ]),
         ];
-        
-        let info_widget = Paragraph::new(info_lines);
-        info_widget.render(chunks[1], buf);
+        Paragraph::new(info_lines).render(chunks[1], buf);
     }
 
     fn render_tabs(&self, area: Rect, buf: &mut Buffer) {
@@ -341,17 +368,20 @@ impl<'a> OracleUi<'a> {
     }
 
     fn render_search(&self, area: Rect, buf: &mut Buffer) {
-        // Different placeholder based on tab context
-        let placeholder = if self.current_tab == Tab::InstalledCrates {
-            if self.selected_installed_crate.is_some() {
-                "Filter items... (e.g., de::Deserialize)"
-            } else {
-                "Search crates... (e.g., serde::de::Value)"
+        // Placeholder and completion context only for the active tab
+        let placeholder = match self.current_tab {
+            Tab::Types => "Search types... (struct, enum, type)",
+            Tab::Functions => "Search functions...",
+            Tab::Modules => "Search modules...",
+            Tab::Crates => {
+                if self.selected_installed_crate.is_some() {
+                    "Filter items... (e.g., de::Deserialize)"
+                } else {
+                    "Search crates... (filter by name)"
+                }
             }
-        } else {
-            "Type to search... (fuzzy matching)"
         };
-        
+
         let search = SearchBar::new(self.search_input, self.theme)
             .focused(self.focus == Focus::Search)
             .placeholder(placeholder);
@@ -383,9 +413,13 @@ impl<'a> OracleUi<'a> {
     fn render_list(&self, area: Rect, buf: &mut Buffer) {
         use ratatui::widgets::{List, ListItem};
 
-        // Handle installed crates tab specially
-        if self.current_tab == Tab::InstalledCrates {
-            self.render_installed_crates_list(area, buf);
+        // Crates tab: crate list (filtered by search) or (when Enter on a crate) that crate's items
+        if self.current_tab == Tab::Crates {
+            if self.selected_installed_crate.is_some() {
+                self.render_installed_crates_list(area, buf);
+            } else {
+                self.render_dependencies_list(area, buf);
+            }
             return;
         }
 
@@ -488,6 +522,10 @@ impl<'a> OracleUi<'a> {
             format!(" Items ({}/{}){} ", self.filtered_items.len(), self.items.len(), scroll_indicator)
         };
 
+        let list_area = Rect {
+            width: area.width.saturating_sub(1),
+            ..area
+        };
         let list = List::new(items)
             .block(
                 Block::default()
@@ -498,7 +536,119 @@ impl<'a> OracleUi<'a> {
             .highlight_style(self.theme.style_selected())
             .highlight_symbol("▸ ");
 
-        Widget::render(list, area, buf);
+        Widget::render(list, list_area, buf);
+
+        if total_items > visible_height {
+            let scrollbar_area = Rect {
+                x: area.x + area.width.saturating_sub(1),
+                y: area.y,
+                width: 1,
+                height: area.height,
+            };
+            let mut state = ScrollbarState::new(total_items).position(scroll_offset);
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓"));
+            StatefulWidget::render(scrollbar, scrollbar_area, buf, &mut state);
+        }
+    }
+
+    fn render_dependencies_list(&self, area: Rect, buf: &mut Buffer) {
+        use ratatui::widgets::{List, ListItem};
+
+        let border_style = if self.focus == Focus::List {
+            self.theme.style_border_focused()
+        } else {
+            self.theme.style_border()
+        };
+        let visible_height = area.height.saturating_sub(2) as usize;
+        let selected = self.list_selected.unwrap_or(0);
+        let (items_slice, total) = if self.filtered_dependency_indices.is_empty() && !self.dependency_tree.is_empty() {
+            (&[][..], 1usize)
+        } else if self.dependency_tree.is_empty() {
+            (&[][..], 1usize)
+        } else {
+            let indices = self.filtered_dependency_indices;
+            (indices, indices.len())
+        };
+        let total = total.max(1);
+        let scroll_offset = if visible_height == 0 {
+            0
+        } else if selected >= visible_height {
+            selected.saturating_sub(visible_height - 1)
+        } else {
+            0
+        };
+
+        let items: Vec<ListItem> = if self.dependency_tree.is_empty() {
+            let is_selected = selected == 0;
+            let style = if is_selected { self.theme.style_selected() } else { Style::default() };
+            vec![ListItem::new(Line::from(vec![
+                Span::styled(if is_selected { "▸ " } else { "  " }, self.theme.style_accent()),
+                Span::styled("○ ", self.theme.style_muted()),
+                Span::styled("No Cargo project", self.theme.style_dim()),
+            ])).style(style)]
+        } else if items_slice.is_empty() {
+            let is_selected = selected == 0;
+            let style = if is_selected { self.theme.style_selected() } else { Style::default() };
+            vec![ListItem::new(Line::from(vec![
+                Span::styled(if is_selected { "▸ " } else { "  " }, self.theme.style_accent()),
+                Span::styled("○ ", self.theme.style_muted()),
+                Span::styled("No matches for search", self.theme.style_dim()),
+            ])).style(style)]
+        } else {
+            items_slice
+                .iter()
+                .enumerate()
+                .skip(scroll_offset)
+                .take(visible_height)
+                .map(|(display_idx, &tree_idx)| {
+                    let (name, _) = &self.dependency_tree[tree_idx];
+                    let is_selected = Some(display_idx) == self.list_selected;
+                    let style = if is_selected { self.theme.style_selected() } else { Style::default() };
+                    ListItem::new(Line::from(vec![
+                        Span::styled(if is_selected { "▸ " } else { "  " }, self.theme.style_accent()),
+                        Span::styled("📦 ", self.theme.style_dim()),
+                        Span::styled(name.clone(), self.theme.style_normal()),
+                    ])).style(style)
+                })
+                .collect()
+        };
+
+        let scroll_info = if total > visible_height {
+            format!(" [{}/{}]", selected + 1, total)
+        } else {
+            String::new()
+        };
+        let title = format!(" Crates ({}){} ", total, scroll_info);
+        let list_area = Rect {
+            width: area.width.saturating_sub(1),
+            ..area
+        };
+        let list = List::new(items)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(border_style)
+                    .title(title),
+            )
+            .highlight_style(self.theme.style_selected())
+            .highlight_symbol("▸ ");
+        Widget::render(list, list_area, buf);
+
+        if total > visible_height {
+            let scrollbar_area = Rect {
+                x: area.x + area.width.saturating_sub(1),
+                y: area.y,
+                width: 1,
+                height: area.height,
+            };
+            let mut state = ScrollbarState::new(total).position(selected);
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓"));
+            StatefulWidget::render(scrollbar, scrollbar_area, buf, &mut state);
+        }
     }
 
     fn render_installed_crates_list(&self, area: Rect, buf: &mut Buffer) {
@@ -598,6 +748,10 @@ impl<'a> OracleUi<'a> {
             let title = format!(" 📦 {} v{} ({} items){} [Esc] ", 
                 crate_info.name, crate_info.version, total_items, scroll_info);
 
+            let list_area = Rect {
+                width: area.width.saturating_sub(1),
+                ..area
+            };
             let list = List::new(items)
                 .block(
                     Block::default()
@@ -607,106 +761,78 @@ impl<'a> OracleUi<'a> {
                 )
                 .highlight_style(self.theme.style_selected());
 
-            Widget::render(list, area, buf);
-        } else {
-            // Show list of installed crates with scrolling
-            let query = self.search_input.to_lowercase();
-            
-            // For qualified paths, only use the first part (crate name) for filtering
-            let filter_query = if query.contains("::") {
-                query.split("::").next().unwrap_or("").to_string()
-            } else {
-                query.clone()
-            };
-            
-            let filtered_crates: Vec<(usize, &String)> = self
-                .installed_crates
-                .iter()
-                .enumerate()
-                .filter(|(_, name)| {
-                    filter_query.is_empty() || 
-                    name.to_lowercase().contains(&filter_query) ||
-                    name.to_lowercase().replace('-', "_").contains(&filter_query)
-                })
-                .collect();
-            
-            let total_crates = filtered_crates.len();
-            
-            // Calculate scroll offset
-            let scroll_offset = if let Some(sel) = selected {
-                if visible_height == 0 {
-                    0
-                } else if sel >= visible_height {
-                    sel.saturating_sub(visible_height - 1)
-                } else {
-                    0
-                }
-            } else {
-                0
-            };
-            
-            let items: Vec<ListItem> = filtered_crates
-                .into_iter()
-                .skip(scroll_offset)
-                .take(visible_height)
-                .map(|(idx, name)| {
-                    let is_selected = Some(idx) == selected;
-                    let base_style = if is_selected {
-                        self.theme.style_selected()
-                    } else {
-                        Style::default()
-                    };
+            Widget::render(list, list_area, buf);
 
-                    let prefix = if is_selected { "▸ " } else { "  " };
-
-                    ListItem::new(Line::from(vec![
-                        Span::styled(prefix, self.theme.style_accent()),
-                        Span::styled("📦 ", self.theme.style_dim()),
-                        Span::styled(name.clone(), self.theme.style_normal()),
-                    ]))
-                    .style(base_style)
-                })
-                .collect();
-
-            // Scroll indicator
-            let scroll_info = if total_crates > visible_height {
-                format!(" [{}/{}]", selected.unwrap_or(0) + 1, total_crates)
-            } else {
-                String::new()
-            };
-            
-            let title = if filter_query.is_empty() {
-                format!(" Installed Crates ({}){} ", self.installed_crates.len(), scroll_info)
-            } else {
-                format!(" Installed Crates ({}/{}) [{}]{} ", total_crates, self.installed_crates.len(), filter_query, scroll_info)
-            };
-
-            let list = List::new(items)
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(border_style)
-                        .title(title),
-                )
-                .highlight_style(self.theme.style_selected());
-
-            Widget::render(list, area, buf);
+            if total_items > visible_height {
+                let scrollbar_area = Rect {
+                    x: area.x + area.width.saturating_sub(1),
+                    y: area.y,
+                    width: 1,
+                    height: area.height,
+                };
+                let mut state = ScrollbarState::new(total_items).position(scroll_offset);
+                let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                    .begin_symbol(Some("↑"))
+                    .end_symbol(Some("↓"));
+                StatefulWidget::render(scrollbar, scrollbar_area, buf, &mut state);
+            }
         }
     }
 
     fn render_inspector(&self, area: Rect, buf: &mut Buffer) {
-        if self.current_tab == Tab::Dependencies {
-            let dep_view = DependencyView::new(self.theme)
-                .crate_info(self.crate_info)
-                .dependency_tree(self.dependency_tree)
-                .focused(self.focus == Focus::Inspector);
-            dep_view.render(area, buf);
-        } else if self.current_tab == Tab::InstalledCrates && self.selected_installed_crate.is_some() && self.selected_item.is_none() {
-            // Show crate info when a crate is selected but no item is selected
-            self.render_installed_crate_info(area, buf);
+        if self.current_tab == Tab::Crates && self.selected_installed_crate.is_some() {
+            // Dependencies: inside a crate — show crate info or selected item
+            if self.selected_item.is_none() {
+                self.render_installed_crate_info(area, buf);
+            } else {
+                let inspector = InspectorPanel::new(self.theme)
+                    .item(self.selected_item)
+                    .all_items(self.all_items_impl_lookup)
+                    .focused(self.focus == Focus::Inspector)
+                    .scroll(self.inspector_scroll);
+                inspector.render(area, buf);
+            }
+        } else if self.current_tab == Tab::Crates {
+            let root_name = self.dependency_tree.first().map(|(n, _)| n.as_str());
+            let selected_name = self
+                .list_selected
+                .and_then(|i| self.filtered_dependency_indices.get(i).copied())
+                .and_then(|tree_idx| self.dependency_tree.get(tree_idx))
+                .map(|(n, _)| n.as_str());
+            let showing_root = root_name.zip(selected_name).map(|(r, s)| r == s).unwrap_or(true);
+            if showing_root {
+                let dep_view = DependencyView::new(self.theme)
+                    .crate_info(self.crate_info)
+                    .focused(self.focus == Focus::Inspector)
+                    .scroll(self.inspector_scroll)
+                    .show_browser_hint(true);
+                dep_view.render(area, buf);
+            } else if let Some(name) = selected_name {
+                if self.crate_doc_loading {
+                    dependency_view::render_doc_loading(self.theme, area, buf, name);
+                } else if self.crate_doc_failed {
+                    dependency_view::render_doc_failed(self.theme, area, buf, name);
+                } else if let Some(doc) = self.crate_doc {
+                    let doc_view = DependencyDocView::new(self.theme, doc)
+                        .focused(self.focus == Focus::Inspector)
+                        .scroll(self.inspector_scroll)
+                        .show_browser_hint(true);
+                    doc_view.render(area, buf);
+                } else {
+                    dependency_view::render_doc_loading(self.theme, area, buf, name);
+                }
+            } else {
+                let dep_view = DependencyView::new(self.theme)
+                    .crate_info(self.crate_info)
+                    .focused(self.focus == Focus::Inspector)
+                    .scroll(self.inspector_scroll)
+                    .show_browser_hint(true);
+                dep_view.render(area, buf);
+            }
         } else {
             let inspector = InspectorPanel::new(self.theme)
                 .item(self.selected_item)
+                .all_items(self.all_items_impl_lookup)
                 .focused(self.focus == Focus::Inspector)
                 .scroll(self.inspector_scroll);
             inspector.render(area, buf);
@@ -846,11 +972,19 @@ impl<'a> OracleUi<'a> {
             Span::raw("  "),
             Span::styled("Select an item to view details", self.theme.style_muted()),
         ]));
+        lines.push(Line::from(""));
+        lines.push(Line::from(vec![
+            Span::styled(" [o] ", self.theme.style_accent()),
+            Span::styled("docs.rs  ", self.theme.style_dim()),
+            Span::styled(" [c] ", self.theme.style_accent()),
+            Span::styled("crates.io", self.theme.style_dim()),
+        ]));
 
         let block = Block::default()
             .borders(Borders::ALL)
+            .border_type(ratatui::widgets::block::BorderType::Rounded)
             .border_style(border_style)
-            .title(" 📦 Crate Info ");
+            .title(" ◇ Crate Info ");
 
         let paragraph = Paragraph::new(lines)
             .block(block)
@@ -868,8 +1002,8 @@ impl<'a> OracleUi<'a> {
         };
 
         // Different footer for different contexts
-        let status_line = if self.current_tab == Tab::InstalledCrates {
-            // Crates tab footer
+        let status_line = if self.current_tab == Tab::Crates && self.selected_installed_crate.is_some() {
+            // Dependencies: inside a crate
             if let Some(crate_info) = self.selected_installed_crate {
                 let selection_info = if let Some(selected) = self.list_selected {
                     format!("[{}/{}]", selected + 1, self.installed_crate_items.len())
@@ -889,14 +1023,31 @@ impl<'a> OracleUi<'a> {
                 ])
             } else {
                 Line::from(vec![
-                    Span::styled(" 📦 Installed Crates ", self.theme.style_accent()),
-                    Span::styled(format!("({}) ", self.installed_crates.len()), self.theme.style_normal()),
-                    Span::styled("│ ", self.theme.style_muted()),
+                    Span::styled(" 📦 Crates ", self.theme.style_accent()),
                     Span::styled(focus_indicator.0, self.theme.style_accent()),
                     Span::styled(format!(" {} ", focus_indicator.1), self.theme.style_dim()),
-                    Span::styled("│ Enter: select │ Type: search", self.theme.style_muted()),
+                    Span::styled("│ Esc: back", self.theme.style_muted()),
                 ])
             }
+        } else if self.current_tab == Tab::Crates {
+            Line::from(vec![
+                Span::styled("Commands: ", self.theme.style_dim()),
+                Span::styled("Tab", self.theme.style_accent()),
+                Span::styled(" focus ", self.theme.style_muted()),
+                Span::styled("↑/↓", self.theme.style_accent()),
+                Span::styled(" list ",
+                self.theme.style_muted()),
+                Span::styled("Enter", self.theme.style_accent()),
+                Span::styled(" open crate ",
+                self.theme.style_muted()),
+                Span::styled("[o]", self.theme.style_accent()),
+                Span::styled(" docs.rs ", self.theme.style_muted()),
+                Span::styled("[c]", self.theme.style_accent()),
+                Span::styled(" crates.io ", self.theme.style_muted()),
+                Span::styled("│ ", self.theme.style_dim()),
+                Span::styled("📦", self.theme.style_accent()),
+                Span::styled(format!(" Crates ({}) ", self.filtered_dependency_indices.len()), self.theme.style_normal()),
+            ])
         } else if !self.status_message.is_empty() {
             // Custom status message
             Line::from(vec![
@@ -907,7 +1058,7 @@ impl<'a> OracleUi<'a> {
             ])
         } else {
             // Normal footer with counts
-            let (fn_count, struct_count, enum_count, trait_count) = self.items.iter().fold(
+            let (fn_count, struct_count, _enum_count, _trait_count) = self.items.iter().fold(
                 (0usize, 0usize, 0usize, 0usize),
                 |(f, s, e, t), item| match item.kind() {
                     "fn" => (f + 1, s, e, t),
@@ -925,25 +1076,81 @@ impl<'a> OracleUi<'a> {
             };
 
             Line::from(vec![
-                Span::styled(" fn:", self.theme.style_function()),
-                Span::styled(format!("{}", fn_count), self.theme.style_normal()),
-                Span::styled(" struct:", self.theme.style_type()),
-                Span::styled(format!("{}", struct_count), self.theme.style_normal()),
-                Span::styled(" enum:", self.theme.style_type()),
-                Span::styled(format!("{}", enum_count), self.theme.style_normal()),
-                Span::styled(" trait:", self.theme.style_keyword()),
-                Span::styled(format!("{}", trait_count), self.theme.style_normal()),
-                Span::styled(" │ ", self.theme.style_muted()),
-                Span::styled(selection_info, self.theme.style_muted()),
-                Span::styled(" │ ", self.theme.style_muted()),
-                Span::styled(focus_indicator.0, self.theme.style_accent()),
-                Span::styled(format!(" {}", focus_indicator.1), self.theme.style_dim()),
+                Span::styled("Commands: ", self.theme.style_dim()),
+                Span::styled("Tab", self.theme.style_accent()),
+                Span::styled(" focus ", self.theme.style_muted()),
+                Span::styled("↑/↓", self.theme.style_accent()),
+                Span::styled(" list ", self.theme.style_muted()),
+                Span::styled("1-4", self.theme.style_accent()),
+                Span::styled(" tabs ", self.theme.style_muted()),
+                Span::styled("? ", self.theme.style_accent()),
+                Span::styled("help ", self.theme.style_muted()),
+                Span::styled("q ", self.theme.style_accent()),
+                Span::styled("quit ", self.theme.style_muted()),
+                Span::styled("│ ", self.theme.style_dim()),
+                Span::styled("fn:", self.theme.style_function()),
+                Span::styled(format!("{} ", fn_count), self.theme.style_normal()),
+                Span::styled("struct:", self.theme.style_type()),
+                Span::styled(format!("{} ", struct_count), self.theme.style_normal()),
+                Span::styled("selection ", self.theme.style_muted()),
+                Span::styled(selection_info, self.theme.style_dim()),
             ])
         };
 
-        let paragraph = Paragraph::new(status_line)
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(self.theme.style_border())
             .style(Style::default().bg(self.theme.bg_panel));
-        paragraph.render(area, buf);
+        let inner = block.inner(area);
+        block.render(area, buf);
+        let paragraph = Paragraph::new(status_line)
+            .alignment(ratatui::layout::Alignment::Center);
+        paragraph.render(inner, buf);
+    }
+
+    fn render_settings_overlay(&self, area: Rect, buf: &mut Buffer) {
+        if !self.show_settings {
+            return;
+        }
+
+        let w = 48.min(area.width.saturating_sub(4));
+        let h = 10.min(area.height.saturating_sub(4));
+        let settings_area = Rect {
+            x: area.x + (area.width - w) / 2,
+            y: area.y + (area.height - h) / 2,
+            width: w,
+            height: h,
+        };
+
+        Clear.render(settings_area, buf);
+
+        let text = vec![
+            Line::from(Span::styled(
+                " Settings ",
+                self.theme.style_accent_bold(),
+            )),
+            Line::from(""),
+            Line::from(Span::styled("Theme", self.theme.style_dim())),
+            Line::from(vec![
+                Span::raw("  Press "),
+                Span::styled("t", self.theme.style_accent()),
+                Span::raw(" to cycle theme"),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Press Esc or S to close",
+                self.theme.style_muted(),
+            )),
+        ];
+
+        let block = Paragraph::new(text).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(self.theme.style_border_focused())
+                .title(" Settings ")
+                .style(Style::default().bg(self.theme.bg_panel)),
+        );
+        block.render(settings_area, buf);
     }
 
     fn render_help_overlay(&self, area: Rect, buf: &mut Buffer) {
@@ -1005,7 +1212,7 @@ impl<'a> OracleUi<'a> {
             ]),
             Line::from(vec![
                 Span::styled("  1-4        ", self.theme.style_accent()),
-                Span::raw("Switch to tab (Types/Fn/Mod/Deps)"),
+                Span::raw("Switch to tab (Types/Fn/Mod/Crates)"),
             ]),
             Line::from(vec![
                 Span::styled("  Esc        ", self.theme.style_accent()),
@@ -1020,6 +1227,18 @@ impl<'a> OracleUi<'a> {
             Line::from(vec![
                 Span::styled("  ?          ", self.theme.style_accent()),
                 Span::raw("Toggle this help"),
+            ]),
+            Line::from(vec![
+                Span::styled("  t          ", self.theme.style_accent()),
+                Span::raw("Cycle theme"),
+            ]),
+            Line::from(vec![
+                Span::styled("  S          ", self.theme.style_accent()),
+                Span::raw("Settings (theme)"),
+            ]),
+            Line::from(vec![
+                Span::styled("  o / O      ", self.theme.style_accent()),
+                Span::raw("Open crate in browser (Crates): [o] docs.rs  [c] crates.io"),
             ]),
             Line::from(""),
             Line::from(Span::styled(
@@ -1042,18 +1261,15 @@ impl<'a> OracleUi<'a> {
 
 impl Widget for OracleUi<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        // Determine header height based on terminal size
         let header_height = if area.height >= 30 { 6 } else { 2 };
-        
-        // Main layout
         let chunks = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(header_height),  // Header (dynamic)
-                Constraint::Length(2),  // Tabs
-                Constraint::Length(3),  // Search
-                Constraint::Min(10),    // Content
-                Constraint::Length(1),  // Status/Footer
+                Constraint::Length(header_height),
+                Constraint::Length(2),
+                Constraint::Length(3),
+                Constraint::Min(10),
+                Constraint::Length(3),
             ])
             .split(area);
 
@@ -1061,23 +1277,21 @@ impl Widget for OracleUi<'_> {
         self.render_tabs(chunks[1], buf);
         self.render_search(chunks[2], buf);
 
-        // Content area: split into list and inspector
         let content_chunks = Layout::default()
             .direction(Direction::Horizontal)
             .constraints([
-                Constraint::Percentage(35),
-                Constraint::Percentage(65),
+                Constraint::Percentage(20),
+                Constraint::Percentage(80),
             ])
             .margin(0)
             .split(chunks[3]);
 
         self.render_list(content_chunks[0], buf);
         self.render_inspector(content_chunks[1], buf);
-
         self.render_status(chunks[4], buf);
 
-        // Overlays
         self.render_completion(chunks[2], buf);
+        self.render_settings_overlay(area, buf);
         self.render_help_overlay(area, buf);
     }
 }

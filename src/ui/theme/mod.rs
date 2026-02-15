@@ -2,6 +2,60 @@
 
 use ratatui::style::{Color, Modifier, Style};
 
+/// Theme preset identifier (for config and cycling)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeKind {
+    DefaultDark,
+    Nord,
+    CatppuccinMocha,
+    Dracula,
+}
+
+impl ThemeKind {
+    pub const ALL: &'static [ThemeKind] = &[
+        ThemeKind::DefaultDark,
+        ThemeKind::Nord,
+        ThemeKind::CatppuccinMocha,
+        ThemeKind::Dracula,
+    ];
+
+    pub fn name(&self) -> &'static str {
+        match self {
+            ThemeKind::DefaultDark => "default_dark",
+            ThemeKind::Nord => "nord",
+            ThemeKind::CatppuccinMocha => "catppuccin_mocha",
+            ThemeKind::Dracula => "dracula",
+        }
+    }
+
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            ThemeKind::DefaultDark => "Default Dark",
+            ThemeKind::Nord => "Nord",
+            ThemeKind::CatppuccinMocha => "Catppuccin Mocha",
+            ThemeKind::Dracula => "Dracula",
+        }
+    }
+
+    pub fn from_name(name: &str) -> Self {
+        let s = name.to_lowercase();
+        let s = s.trim();
+        match s {
+            "nord" => ThemeKind::Nord,
+            "catppuccin_mocha" | "catppuccin" | "mocha" | "catppuccin mocha" => ThemeKind::CatppuccinMocha,
+            "dracula" => ThemeKind::Dracula,
+            "default_dark" | "default" | "default dark" => ThemeKind::DefaultDark,
+            _ => ThemeKind::DefaultDark,
+        }
+    }
+
+    pub fn next(self) -> Self {
+        let i = Self::ALL.iter().position(|&k| k == self).unwrap_or(0);
+        let next = (i + 1) % Self::ALL.len();
+        Self::ALL[next]
+    }
+}
+
 /// Color palette for the UI
 #[derive(Debug, Clone)]
 pub struct Theme {
@@ -136,6 +190,23 @@ impl Theme {
         }
     }
 
+    pub fn from_kind(kind: ThemeKind) -> Self {
+        match kind {
+            ThemeKind::DefaultDark => Self::default_dark(),
+            ThemeKind::Nord => Self::nord(),
+            ThemeKind::CatppuccinMocha => Self::catppuccin_mocha(),
+            ThemeKind::Dracula => Self::dracula(),
+        }
+    }
+
+    pub fn from_name(name: &str) -> Self {
+        Self::from_kind(ThemeKind::from_name(name))
+    }
+
+    pub fn kind(&self) -> ThemeKind {
+        ThemeKind::from_name(&self.name)
+    }
+
     // Style builders
     pub fn style_accent(&self) -> Style {
         Style::default().fg(self.accent)
@@ -161,8 +232,10 @@ impl Theme {
         Style::default().bg(self.bg_highlight)
     }
 
+    /// Style for selected list rows. Uses explicit fg so text stays readable on the highlight background.
     pub fn style_selected(&self) -> Style {
         Style::default()
+            .fg(self.fg)
             .bg(self.bg_highlight)
             .add_modifier(Modifier::BOLD)
     }

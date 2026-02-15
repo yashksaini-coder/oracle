@@ -56,18 +56,29 @@ impl RustAnalyzer {
         let mut items = Vec::new();
 
         for item in syntax_tree.items {
+            // Inline modules: expand inner items as first-class AnalyzedItems with synthetic path
+            if let Item::Mod(md) = &item {
+                if let Some((_, ref content)) = &md.content {
+                    let child_path: Vec<String> = {
+                        let mut p = module_path.clone();
+                        p.push(md.ident.to_string());
+                        p
+                    };
+                    let inner = self.collect_inline_module_items(content, &path, child_path);
+                    items.extend(inner);
+                }
+            }
+
             if let Some(mut analyzed) = self.analyze_item(&item, &path) {
-                // Set module path
                 Self::set_module_path(&mut analyzed, module_path.clone());
-                
-                // Try to find line number from span
+
                 if let Some(ref file_path) = path {
                     if let Some(span) = Self::get_item_span(&item) {
                         let line = span.start().line;
                         Self::set_source_location(&mut analyzed, file_path.clone(), line);
                     }
                 }
-                
+
                 if self.include_private || self.is_public(&analyzed) {
                     items.push(analyzed);
                 }
@@ -75,6 +86,42 @@ impl RustAnalyzer {
         }
 
         Ok(items)
+    }
+
+    /// Recursively collect items from inline module content as first-class AnalyzedItems.
+    fn collect_inline_module_items(
+        &self,
+        content: &[Item],
+        path: &Option<PathBuf>,
+        module_path: Vec<String>,
+    ) -> Vec<AnalyzedItem> {
+        let mut items = Vec::new();
+        for item in content {
+            if let Item::Mod(md) = item {
+                if let Some((_, ref inner_content)) = &md.content {
+                    let child_path: Vec<String> = {
+                        let mut p = module_path.clone();
+                        p.push(md.ident.to_string());
+                        p
+                    };
+                    let inner = self.collect_inline_module_items(inner_content, path, child_path);
+                    items.extend(inner);
+                }
+            }
+            if let Some(mut analyzed) = self.analyze_item(item, path) {
+                Self::set_module_path(&mut analyzed, module_path.clone());
+                if let Some(ref file_path) = path {
+                    if let Some(span) = Self::get_item_span(item) {
+                        let line = span.start().line;
+                        Self::set_source_location(&mut analyzed, file_path.clone(), line);
+                    }
+                }
+                if self.include_private || self.is_public(&analyzed) {
+                    items.push(analyzed);
+                }
+            }
+        }
+        items
     }
 
     /// Derive module path from file path (e.g., src/analyzer/parser.rs -> ["analyzer", "parser"])

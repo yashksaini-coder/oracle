@@ -2,12 +2,16 @@
 
 use crate::analyzer::{CrateInfo, CrateRegistry, DependencyAnalyzer, AnalyzedItem, InstalledCrate, RustAnalyzer};
 use crate::config::Settings;
+use crate::crates_io::CrateDocInfo;
 use crate::error::Result;
 use crate::ui::{filter_candidates, CandidateKind, CompletionCandidate, Focus, Tab};
 use crate::ui::theme::Theme;
 
 use ratatui::widgets::ListState;
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::sync::mpsc;
+use std::thread;
 
 /// Main application state
 pub struct App {
@@ -16,6 +20,8 @@ pub struct App {
     pub filtered_items: Vec<usize>,
     pub crate_info: Option<CrateInfo>,
     pub dependency_tree: Vec<(String, usize)>,
+    /// Indices into dependency_tree for Crates tab list (filtered by search). Empty = not computed.
+    pub filtered_dependency_indices: Vec<usize>,
 
     // Installed crates registry
     pub crate_registry: CrateRegistry,
@@ -32,6 +38,7 @@ pub struct App {
     pub completion_selected: usize,
     pub show_completion: bool,
     pub show_help: bool,
+    pub show_settings: bool,
     pub status_message: String,
 
     // Search
@@ -45,15 +52,27 @@ pub struct App {
     // Control
     pub should_quit: bool,
     pub project_path: Option<PathBuf>,
+
+    // Dependency tab: fetched docs from crates.io (background thread, bounded cache)
+    pub crate_docs_cache: HashMap<String, CrateDocInfo>,
+    pub crate_docs_loading: Option<String>,
+    pub crate_docs_failed: HashSet<String>,
+    crate_docs_tx: mpsc::Sender<(String, Option<CrateDocInfo>)>,
+    pub crate_docs_rx: mpsc::Receiver<(String, Option<CrateDocInfo>)>,
 }
+
+/// Max crates to keep in docs cache (memory bound).
+const CRATE_DOCS_CACHE_MAX: usize = 50;
 
 impl App {
     pub fn new() -> Self {
+        let (crate_docs_tx, crate_docs_rx) = mpsc::channel();
         Self {
             items: Vec::new(),
             filtered_items: Vec::new(),
             crate_info: None,
             dependency_tree: Vec::new(),
+            filtered_dependency_indices: Vec::new(),
             crate_registry: CrateRegistry::new(),
             installed_crates_list: Vec::new(),
             selected_installed_crate: None,
@@ -66,6 +85,7 @@ impl App {
             completion_selected: 0,
             show_completion: false,
             show_help: false,
+            show_settings: false,
             status_message: String::from("Ready"),
             candidates: Vec::new(),
             filtered_candidates: Vec::new(),
@@ -73,13 +93,32 @@ impl App {
             theme: Theme::default(),
             should_quit: false,
             project_path: None,
+            crate_docs_cache: HashMap::new(),
+            crate_docs_loading: None,
+            crate_docs_failed: HashSet::new(),
+            crate_docs_tx,
+            crate_docs_rx,
         }
     }
 
     /// Load settings from config file
     pub fn load_settings(&mut self) -> Result<()> {
         self.settings = Settings::load()?;
+        self.theme = Theme::from_name(&self.settings.ui.theme);
         Ok(())
+    }
+
+    /// Cycle to the next theme and persist to config
+    pub fn cycle_theme(&mut self) {
+        let next = self.theme.kind().next();
+        self.theme = Theme::from_kind(next);
+        self.settings.ui.theme = next.name().to_string();
+        self.status_message = format!("Theme: {}", next.display_name());
+        let _ = self.settings.save();
+    }
+
+    pub fn toggle_settings(&mut self) {
+        self.show_settings = !self.show_settings;
     }
 
     /// Analyze a Rust project
@@ -182,9 +221,37 @@ impl App {
     pub fn filter_items(&mut self) {
         let query = self.search_input.to_lowercase();
 
-        // Handle installed crates tab separately
-        if self.current_tab == Tab::InstalledCrates {
+        // Crates tab: when inside a crate, filter its items
+        if self.current_tab == Tab::Crates && self.selected_installed_crate.is_some() {
             self.filter_installed_crates();
+            return;
+        }
+
+        // Crates tab (top level): filter crate list by name, keep alphabetical order
+        if self.current_tab == Tab::Crates {
+            let mut indices: Vec<usize> = self
+                .dependency_tree
+                .iter()
+                .enumerate()
+                .filter(|(_, (name, _))| {
+                    query.is_empty()
+                        || name.to_lowercase().contains(&query)
+                        || name.to_lowercase().replace('-', "_").contains(&query)
+                })
+                .map(|(i, _)| i)
+                .collect();
+            indices.sort_by(|&a, &b| {
+                self.dependency_tree[a]
+                    .0
+                    .to_lowercase()
+                    .cmp(&self.dependency_tree[b].0.to_lowercase())
+            });
+            self.filtered_dependency_indices = indices;
+            if self.list_state.selected().is_some_and(|s| s >= self.filtered_dependency_indices.len()) {
+                self.list_state.select(Some(0));
+            }
+            self.filtered_candidates = Vec::new();
+            self.completion_selected = 0;
             return;
         }
 
@@ -203,8 +270,7 @@ impl App {
                     ),
                     Tab::Functions => matches!(item, AnalyzedItem::Function(_)),
                     Tab::Modules => matches!(item, AnalyzedItem::Module(_)),
-                    Tab::Dependencies => true, // Show all in dependencies tab
-                    Tab::InstalledCrates => false, // Handled separately
+                    Tab::Crates => true, // Handled by crate list or filter_installed_crates
                 };
 
                 // Filter by search
@@ -221,8 +287,23 @@ impl App {
             self.list_state.select(Some(0));
         }
 
-        // Update completion candidates
-        self.filtered_candidates = filter_candidates(&self.candidates, &self.search_input);
+        // Update completion candidates; only show candidates relevant to the active tab
+        let matched = filter_candidates(&self.candidates, &self.search_input);
+        self.filtered_candidates = match self.current_tab {
+            Tab::Types => matched
+                .into_iter()
+                .filter(|c| matches!(c.kind, CandidateKind::Struct | CandidateKind::Enum | CandidateKind::Type))
+                .collect(),
+            Tab::Functions => matched
+                .into_iter()
+                .filter(|c| c.kind == CandidateKind::Function)
+                .collect(),
+            Tab::Modules => matched
+                .into_iter()
+                .filter(|c| c.kind == CandidateKind::Module)
+                .collect(),
+            Tab::Crates => Vec::new(),
+        };
         self.completion_selected = 0;
     }
 
@@ -358,13 +439,110 @@ impl App {
         self.list_state.select(Some(0));
     }
 
+    /// Crates to show in Crates tab: project dependencies when we have a Cargo project, else all installed.
+    pub fn installed_crates_display_list(&self) -> Vec<String> {
+        let project_dep_names: HashSet<String> = self
+            .dependency_tree
+            .iter()
+            .filter(|(_, depth)| *depth > 0)
+            .map(|(name, _)| name.clone())
+            .collect();
+        if project_dep_names.is_empty() {
+            self.installed_crates_list.clone()
+        } else {
+            self.installed_crates_list
+                .iter()
+                .filter(|n| project_dep_names.contains(*n))
+                .cloned()
+                .collect()
+        }
+    }
+
+    /// Crate name for "open in browser" (o key): current crate when inside one, or selected dep from list.
+    pub fn selected_crate_name_for_display(&self) -> Option<String> {
+        if self.current_tab != Tab::Crates {
+            return None;
+        }
+        if let Some(ref c) = self.selected_installed_crate {
+            return Some(c.name.clone());
+        }
+        self.selected_dependency_name()
+    }
+
+    /// Selected crate name in Crates tab (root or a dep). None if inside a crate, empty list, or wrong tab.
+    pub fn selected_dependency_name(&self) -> Option<String> {
+        if self.current_tab != Tab::Crates
+            || self.selected_installed_crate.is_some()
+            || self.dependency_tree.is_empty()
+        {
+            return None;
+        }
+        let list_idx = self.list_state.selected().unwrap_or(0);
+        let tree_idx = self.filtered_dependency_indices.get(list_idx).copied()?;
+        self.dependency_tree.get(tree_idx).map(|(name, _)| name.clone())
+    }
+
+    /// Root crate name in dependency tree (first entry, depth 0). None if no tree.
+    pub fn dependency_root_name(&self) -> Option<&str> {
+        self.dependency_tree.first().map(|(n, _)| n.as_str())
+    }
+
+    /// Process any received crate doc fetch results (call each frame).
+    pub fn poll_crate_docs_rx(&mut self) {
+        while let Ok((name, doc)) = self.crate_docs_rx.try_recv() {
+            if self.crate_docs_loading.as_deref() == Some(name.as_str()) {
+                self.crate_docs_loading = None;
+            }
+            if let Some(info) = doc {
+                if self.crate_docs_cache.len() >= CRATE_DOCS_CACHE_MAX {
+                    if let Some(key) = self.crate_docs_cache.keys().next().cloned() {
+                        self.crate_docs_cache.remove(&key);
+                    }
+                }
+                self.crate_docs_cache.insert(name.clone(), info);
+            } else {
+                self.crate_docs_failed.insert(name);
+            }
+        }
+    }
+
+    /// If on Crates tab and selected crate is not root and not cached/loading/failed, start fetch in background.
+    pub fn maybe_start_crate_doc_fetch(&mut self) {
+        if self.current_tab != Tab::Crates {
+            return;
+        }
+        let Some(name) = self.selected_dependency_name() else { return };
+        if self.dependency_root_name() == Some(name.as_str()) {
+            return; // selected root: show local crate_info, no fetch
+        }
+        if self.crate_docs_cache.contains_key(&name)
+            || self.crate_docs_loading.as_deref() == Some(name.as_str())
+            || self.crate_docs_failed.contains(&name)
+        {
+            return;
+        }
+        self.crate_docs_loading = Some(name.clone());
+        let tx = self.crate_docs_tx.clone();
+        thread::spawn(move || {
+            let result = crate::crates_io::fetch_crate_docs(&name);
+            let _ = tx.send((name, result));
+        });
+    }
+
     /// Get current list length based on tab and selection state
     pub fn get_current_list_len(&self) -> usize {
-        if self.current_tab == Tab::InstalledCrates {
+        if self.current_tab == Tab::Crates {
             if self.selected_installed_crate.is_some() {
                 self.installed_crate_filtered.len()
             } else {
-                self.installed_crates_list.len()
+                let n = self.filtered_dependency_indices.len();
+                if self.dependency_tree.is_empty() {
+                    1
+                } else if n == 0 {
+                    1
+                } else {
+                    n
+                }
             }
         } else {
             self.filtered_items.len()
@@ -373,26 +551,24 @@ impl App {
 
     /// Get the currently selected item
     pub fn selected_item(&self) -> Option<&AnalyzedItem> {
-        if self.current_tab == Tab::InstalledCrates {
-            if self.selected_installed_crate.is_some() {
-                self.list_state
-                    .selected()
-                    .and_then(|i| self.installed_crate_filtered.get(i))
-                    .and_then(|&idx| self.installed_crate_items.get(idx))
-            } else {
-                None
-            }
-        } else {
-            self.list_state
+        if self.current_tab == Tab::Crates && self.selected_installed_crate.is_some() {
+            return self.list_state
                 .selected()
-                .and_then(|i| self.filtered_items.get(i))
-                .and_then(|&idx| self.items.get(idx))
+                .and_then(|i| self.installed_crate_filtered.get(i))
+                .and_then(|&idx| self.installed_crate_items.get(idx));
         }
+        if self.current_tab == Tab::Crates {
+            return None; // Inspector shows root/crate docs, not an item
+        }
+        self.list_state
+            .selected()
+            .and_then(|i| self.filtered_items.get(i))
+            .and_then(|&idx| self.items.get(idx))
     }
 
     /// Get filtered items as references
     pub fn get_filtered_items(&self) -> Vec<&AnalyzedItem> {
-        if self.current_tab == Tab::InstalledCrates && self.selected_installed_crate.is_some() {
+        if self.current_tab == Tab::Crates && self.selected_installed_crate.is_some() {
             self.installed_crate_filtered
                 .iter()
                 .filter_map(|&i| self.installed_crate_items.get(i))
@@ -437,7 +613,7 @@ impl App {
         self.filter_items();
         
         // Scan crates if switching to installed crates tab
-        if self.current_tab == Tab::InstalledCrates && self.installed_crates_list.is_empty() {
+        if self.current_tab == Tab::Crates && self.installed_crates_list.is_empty() {
             let _ = self.scan_installed_crates();
         }
     }
@@ -448,8 +624,7 @@ impl App {
         self.show_completion = false; // Hide completions when switching tabs
         self.filter_items();
         
-        // Scan crates if switching to installed crates tab
-        if self.current_tab == Tab::InstalledCrates && self.installed_crates_list.is_empty() {
+        if self.current_tab == Tab::Crates && self.installed_crates_list.is_empty() {
             let _ = self.scan_installed_crates();
         }
     }
@@ -490,14 +665,13 @@ impl App {
         self.search_input.push(c);
         self.filter_items();
         // Don't show completions in Crates tab - use direct qualified path search
-        self.show_completion = self.search_input.len() >= 2 && self.current_tab != Tab::InstalledCrates;
+        self.show_completion = self.search_input.len() >= 2 && !(self.current_tab == Tab::Crates && self.selected_installed_crate.is_some());
     }
 
     pub fn on_backspace(&mut self) {
         self.search_input.pop();
         self.filter_items();
-        // Don't show completions in Crates tab
-        self.show_completion = self.search_input.len() >= 2 && self.current_tab != Tab::InstalledCrates;
+        self.show_completion = self.search_input.len() >= 2 && !(self.current_tab == Tab::Crates && self.selected_installed_crate.is_some());
     }
 
     pub fn clear_search(&mut self) {

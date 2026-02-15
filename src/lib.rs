@@ -6,6 +6,7 @@
 pub mod analyzer;
 pub mod app;
 pub mod config;
+pub mod crates_io;
 pub mod error;
 pub mod ui;
 pub mod utils;
