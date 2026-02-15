@@ -1,6 +1,6 @@
 # Oracle - Rust Code Inspector - Extended Makefile
 
-.PHONY: all build release run clean test lint lint-fix typecheck fmt fmt-fix check fix dev-setup install publish-dry-run publish clippy clippy-fix clippy-beta machete help
+.PHONY: all build release run clean test lint lint-fix typecheck fmt fmt-fix check fix dev-setup install uninstall publish-dry-run publish clippy clippy-fix clippy-beta machete help
 
 all: help
 
@@ -13,8 +13,14 @@ release:
 	cargo build --release
 
 install:
+	@echo "🧹 Removing old build (target/)..."
+	cargo clean
 	@echo "📥 Installing oracle (from current directory)..."
 	cargo install --path .
+
+uninstall:
+	@echo "🗑️  Uninstalling oracle..."
+	cargo uninstall oracle
 
 publish-dry-run:
 	@echo "🔍 Dry-run: would publish to crates.io..."
@@ -208,7 +214,8 @@ help:
 	@echo "Targets:"
 	@echo "  build        Build debug version"
 	@echo "  release      Build optimized release"
-	@echo "  install      Install binary (cargo install --path .)"
+	@echo "  install      Clean target/ then install binary (cargo install --path .)"
+	@echo "  uninstall   Remove oracle from ~/.cargo/bin (cargo uninstall oracle)"
 	@echo "  publish-dry-run  Check crate for publish (no upload)"
 	@echo "  publish      Publish to crates.io (requires login)"
 	@echo "  run          Run Oracle"
