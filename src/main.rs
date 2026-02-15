@@ -17,9 +17,6 @@ use oracle_lib::{
 };
 use ratatui::layout::Rect;
 use ratatui::{backend::CrosstermBackend, Terminal};
-use std::io::Write;
-use std::path::Path;
-use std::process::Command;
 use std::{env, io, path::PathBuf, time::Duration};
 
 fn main() -> Result<()> {
@@ -87,18 +84,11 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
             last_selected = current_selected;
         }
 
-        // Run Copilot CLI with current inspector item as context (leaves TUI, then returns)
-        if app.run_copilot {
-            if let Some(context) = build_copilot_context(app) {
-                let project_path = app.project_path.as_deref();
-                if let Err(e) = run_copilot_with_context(terminal, &context, project_path) {
-                    app.status_message = format!("Copilot: {}", e);
-                } else {
-                    app.status_message = "Back from Copilot".into();
-                }
-            }
-            app.run_copilot = false;
-            continue;
+        // Poll Copilot chat response (from background thread)
+        if let Ok(response) = app.copilot_rx.try_recv() {
+            app.copilot_chat_messages
+                .push(("assistant".to_string(), response));
+            app.copilot_chat_loading = false;
         }
 
         // Poll crate docs channel and maybe start fetch for selected dependency
@@ -155,7 +145,12 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
                 .show_settings(app.show_settings)
                 .status_message(&app.status_message)
                 .inspector_scroll(inspector_scroll)
-                .animation_state(&animation);
+                .animation_state(&animation)
+                .show_copilot_chat(app.copilot_chat_open)
+                .copilot_chat_messages(&app.copilot_chat_messages)
+                .copilot_chat_input(&app.copilot_chat_input)
+                .copilot_chat_loading(app.copilot_chat_loading)
+                .copilot_chat_scroll(app.copilot_chat_scroll);
 
             frame.render_widget(ui, frame.area());
         })?;
@@ -229,79 +224,42 @@ fn run_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, app: &mut App)
     Ok(())
 }
 
-/// Build a context string for Copilot from the currently selected inspector item.
-fn build_copilot_context(app: &App) -> Option<String> {
-    let item = app.selected_item()?;
-    let loc = item
-        .source_location()
-        .and_then(|l| l.file.as_ref())
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "unknown".to_string());
-    let line = item
-        .source_location()
-        .and_then(|l| l.line)
-        .map(|n| format!(":{}", n))
-        .unwrap_or_default();
-    let mut ctx = format!(
-        "I'm inspecting this Rust item in Oracle TUI. Use it as context for my question.\n\n\
-         **Item:** {} {}\n**Location:** {}{}\n**Definition:**\n```rust\n{}\n```\n",
-        item.kind(),
-        item.qualified_name(),
-        loc,
-        line,
-        item.definition(),
-    );
-    if let Some(doc) = item.documentation() {
-        let doc = doc.lines().take(10).collect::<Vec<_>>().join("\n");
-        ctx.push_str("\n**Docs:**\n");
-        ctx.push_str(&doc);
-        ctx.push('\n');
-    }
-    ctx.push_str("\n---\nAsk me anything about this item (e.g. explain it, suggest changes, find usages).");
-    Some(ctx)
-}
-
-/// Leave TUI, run `copilot -i <context>`, then re-enter TUI.
-fn run_copilot_with_context(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    context: &str,
-    project_path: Option<&Path>,
-) -> Result<()> {
-    use crossterm::cursor::SetCursorStyle;
-
-    // Leave alternate screen and restore terminal so Copilot can take over
-    disable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(
-        stdout,
-        LeaveAlternateScreen,
-        crossterm::event::DisableMouseCapture,
-        SetCursorStyle::DefaultUserShape,
-    )?;
-    stdout.flush()?;
-
-    let mut cmd = Command::new("copilot");
-    cmd.arg("-i").arg(context);
-    if let Some(p) = project_path {
-        cmd.arg("--add-dir").arg(p);
-    }
-    cmd.arg("--allow-all-paths");
-    let status = cmd.status();
-
-    // Re-enter TUI
-    enable_raw_mode()?;
-    execute!(
-        stdout,
-        EnterAlternateScreen,
-        crossterm::event::EnableMouseCapture,
-    )?;
-    stdout.flush()?;
-    terminal.hide_cursor()?;
-
-    match status {
-        Ok(s) if s.success() => Ok(()),
-        Ok(s) => anyhow::bail!("copilot exited with {}", s),
-        Err(e) => anyhow::bail!("failed to run copilot: {}", e),
+fn handle_copilot_chat_input(app: &mut App, code: KeyCode, modifiers: KeyModifiers) {
+    match code {
+        KeyCode::Esc => {
+            app.toggle_copilot_chat();
+        }
+        KeyCode::Enter if modifiers.is_empty() => {
+            app.submit_copilot_message();
+        }
+        KeyCode::Backspace if modifiers.is_empty() => {
+            app.copilot_chat_input.pop();
+        }
+        KeyCode::Char(c) if modifiers.is_empty() || modifiers == KeyModifiers::SHIFT => {
+            app.copilot_chat_input.push(c);
+        }
+        KeyCode::Down | KeyCode::Char('j') => {
+            app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_add(1);
+        }
+        KeyCode::Up | KeyCode::Char('k') => {
+            app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_sub(1);
+        }
+        KeyCode::PageDown => {
+            app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_add(10);
+        }
+        KeyCode::PageUp => {
+            app.copilot_chat_scroll = app.copilot_chat_scroll.saturating_sub(10);
+        }
+        KeyCode::Home | KeyCode::Char('g') => {
+            app.copilot_chat_scroll = 0;
+        }
+        KeyCode::Tab if modifiers.is_empty() => {
+            app.next_focus();
+        }
+        KeyCode::BackTab => {
+            app.prev_focus();
+        }
+        _ => {}
     }
 }
 
@@ -342,7 +300,7 @@ fn handle_key_event(
             if modifiers.contains(KeyModifiers::SHIFT) && app.focus != Focus::Search =>
         {
             if app.selected_item().is_some() {
-                app.run_copilot = true;
+                app.toggle_copilot_chat();
             } else {
                 app.status_message = "Select an item in the list to ask Copilot about it".into();
             }
@@ -359,6 +317,8 @@ fn handle_key_event(
                 app.show_help = false;
             } else if app.show_completion {
                 app.show_completion = false;
+            } else if app.focus == Focus::CopilotChat {
+                app.toggle_copilot_chat();
             } else if app.current_tab == Tab::Crates && app.selected_installed_crate.is_some() {
                 app.clear_installed_crate();
             } else if !app.search_input.is_empty() {
@@ -426,6 +386,7 @@ fn handle_key_event(
         Focus::Search => handle_search_input(app, code, modifiers),
         Focus::List => handle_list_input(app, code, modifiers),
         Focus::Inspector => handle_inspector_input(app, code, modifiers, inspector_scroll),
+        Focus::CopilotChat => handle_copilot_chat_input(app, code, modifiers),
     }
 }
 

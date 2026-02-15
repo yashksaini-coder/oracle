@@ -13,6 +13,7 @@ use crate::utils::dir_size;
 use ratatui::widgets::ListState;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::mpsc;
 use std::thread;
 
@@ -54,9 +55,15 @@ pub struct App {
 
     // Control
     pub should_quit: bool,
-    /// When true, main loop will run Copilot CLI with current inspector item as context.
-    pub run_copilot: bool,
     pub project_path: Option<PathBuf>,
+
+    // In-TUI Copilot chat (panel to the right of inspector)
+    pub copilot_chat_open: bool,
+    /// (role, content) with role "user" or "assistant"
+    pub copilot_chat_messages: Vec<(String, String)>,
+    pub copilot_chat_input: String,
+    pub copilot_chat_loading: bool,
+    pub copilot_chat_scroll: usize,
     /// Size of target/ directory in bytes (build artifacts), if computed.
     pub target_size_bytes: Option<u64>,
 
@@ -66,6 +73,9 @@ pub struct App {
     pub crate_docs_failed: HashSet<String>,
     crate_docs_tx: mpsc::Sender<(String, Option<CrateDocInfo>)>,
     pub crate_docs_rx: mpsc::Receiver<(String, Option<CrateDocInfo>)>,
+
+    pub copilot_tx: mpsc::Sender<String>,
+    pub copilot_rx: mpsc::Receiver<String>,
 }
 
 /// Max crates to keep in docs cache (memory bound).
@@ -74,6 +84,7 @@ const CRATE_DOCS_CACHE_MAX: usize = 50;
 impl App {
     pub fn new() -> Self {
         let (crate_docs_tx, crate_docs_rx) = mpsc::channel();
+        let (copilot_tx, copilot_rx) = mpsc::channel();
         Self {
             items: Vec::new(),
             filtered_items: Vec::new(),
@@ -99,14 +110,20 @@ impl App {
             settings: Settings::default(),
             theme: Theme::default(),
             should_quit: false,
-            run_copilot: false,
             project_path: None,
             target_size_bytes: None,
+            copilot_chat_open: false,
+            copilot_chat_messages: Vec::new(),
+            copilot_chat_input: String::new(),
+            copilot_chat_loading: false,
+            copilot_chat_scroll: 0,
             crate_docs_cache: HashMap::new(),
             crate_docs_loading: None,
             crate_docs_failed: HashSet::new(),
             crate_docs_tx,
             crate_docs_rx,
+            copilot_tx,
+            copilot_rx,
         }
     }
 
@@ -679,11 +696,11 @@ impl App {
     }
 
     pub fn next_focus(&mut self) {
-        self.focus = self.focus.next();
+        self.focus = self.focus.next(self.copilot_chat_open);
     }
 
     pub fn prev_focus(&mut self) {
-        self.focus = self.focus.prev();
+        self.focus = self.focus.prev(self.copilot_chat_open);
     }
 
     pub fn next_completion(&mut self) {
@@ -734,6 +751,100 @@ impl App {
 
     pub fn toggle_help(&mut self) {
         self.show_help = !self.show_help;
+    }
+
+    /// Build context string for the currently selected item (for Copilot).
+    pub fn build_copilot_context(&self) -> Option<String> {
+        let item = self.selected_item()?;
+        let loc = item
+            .source_location()
+            .and_then(|l| l.file.as_ref())
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let line = item
+            .source_location()
+            .and_then(|l| l.line)
+            .map(|n| format!(":{}", n))
+            .unwrap_or_default();
+        let mut ctx = format!(
+            "I'm inspecting this Rust item in Oracle TUI. Use it as context.\n\n\
+             **Item:** {} {}\n**Location:** {}{}\n**Definition:**\n```rust\n{}\n```\n",
+            item.kind(),
+            item.qualified_name(),
+            loc,
+            line,
+            item.definition(),
+        );
+        if let Some(doc) = item.documentation() {
+            let doc = doc.lines().take(10).collect::<Vec<_>>().join("\n");
+            ctx.push_str("\n**Docs:**\n");
+            ctx.push_str(&doc);
+            ctx.push('\n');
+        }
+        ctx.push_str("\n---\nAnswer the user's question about this item.");
+        Some(ctx)
+    }
+
+    /// Submit the current chat input to Copilot (spawns thread, sets loading).
+    pub fn submit_copilot_message(&mut self) {
+        let input = self.copilot_chat_input.trim().to_string();
+        if input.is_empty() {
+            return;
+        }
+        self.copilot_chat_input.clear();
+        self.copilot_chat_messages
+            .push(("user".to_string(), input.clone()));
+
+        let context = match self.build_copilot_context() {
+            Some(c) => c,
+            None => {
+                self.copilot_chat_messages
+                    .push(("assistant".to_string(), "No item selected.".to_string()));
+                return;
+            }
+        };
+
+        let mut full_prompt = context;
+        full_prompt.push_str("\n\n**Conversation:**\n");
+        for (role, content) in &self.copilot_chat_messages {
+            let label = if role == "user" { "User" } else { "Assistant" };
+            full_prompt.push_str(&format!("{}: {}\n", label, content));
+        }
+        full_prompt.push_str("\nRespond to the user's latest message above.");
+
+        let tx = self.copilot_tx.clone();
+        let project_path = self.project_path.clone();
+        thread::spawn(move || {
+            let mut cmd = Command::new("copilot");
+            cmd.arg("-p").arg(&full_prompt).arg("--allow-all").arg("-s");
+            if let Some(ref p) = project_path {
+                cmd.arg("--add-dir").arg(p);
+            }
+            let output = cmd.output();
+            let response = match output {
+                Ok(o) if o.status.success() => {
+                    String::from_utf8_lossy(&o.stdout).trim().to_string()
+                }
+                Ok(o) => format!(
+                    "Copilot error (exit {}): {}",
+                    o.status,
+                    String::from_utf8_lossy(&o.stderr)
+                ),
+                Err(e) => format!("Failed to run copilot: {}", e),
+            };
+            let _ = tx.send(response);
+        });
+        self.copilot_chat_loading = true;
+    }
+
+    /// Toggle Copilot chat panel; when opening with an item selected, focus chat.
+    pub fn toggle_copilot_chat(&mut self) {
+        self.copilot_chat_open = !self.copilot_chat_open;
+        if self.copilot_chat_open && self.selected_item().is_some() {
+            self.focus = Focus::CopilotChat;
+        } else if !self.copilot_chat_open && self.focus == Focus::CopilotChat {
+            self.focus = Focus::Inspector;
+        }
     }
 }
 

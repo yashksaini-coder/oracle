@@ -58,22 +58,40 @@ pub enum Focus {
     Search,
     List,
     Inspector,
+    /// In-TUI Copilot chat panel (only when copilot_chat_open)
+    CopilotChat,
 }
 
 impl Focus {
-    pub fn next(&self) -> Self {
+    /// Next focus; when `copilot_chat_open` is true, Inspector -> CopilotChat -> Search.
+    pub fn next(&self, copilot_chat_open: bool) -> Self {
         match self {
             Focus::Search => Focus::List,
             Focus::List => Focus::Inspector,
-            Focus::Inspector => Focus::Search,
+            Focus::Inspector => {
+                if copilot_chat_open {
+                    Focus::CopilotChat
+                } else {
+                    Focus::Search
+                }
+            }
+            Focus::CopilotChat => Focus::Search,
         }
     }
 
-    pub fn prev(&self) -> Self {
+    /// Previous focus.
+    pub fn prev(&self, copilot_chat_open: bool) -> Self {
         match self {
-            Focus::Search => Focus::Inspector,
+            Focus::Search => {
+                if copilot_chat_open {
+                    Focus::CopilotChat
+                } else {
+                    Focus::Inspector
+                }
+            }
             Focus::List => Focus::Search,
             Focus::Inspector => Focus::List,
+            Focus::CopilotChat => Focus::Inspector,
         }
     }
 }

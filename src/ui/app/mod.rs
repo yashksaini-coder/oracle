@@ -56,6 +56,12 @@ pub struct OracleUi<'a> {
     pub(super) inspector_scroll: usize,
     pub(super) animation: Option<&'a AnimationState>,
     pub(super) theme: &'a Theme,
+    // Copilot in-TUI chat
+    pub(super) show_copilot_chat: bool,
+    pub(super) copilot_chat_messages: &'a [(String, String)],
+    pub(super) copilot_chat_input: &'a str,
+    pub(super) copilot_chat_loading: bool,
+    pub(super) copilot_chat_scroll: usize,
 }
 
 impl<'a> OracleUi<'a> {
@@ -87,6 +93,11 @@ impl<'a> OracleUi<'a> {
             inspector_scroll: 0,
             animation: None,
             theme,
+            show_copilot_chat: false,
+            copilot_chat_messages: &[],
+            copilot_chat_input: "",
+            copilot_chat_loading: false,
+            copilot_chat_scroll: 0,
         }
     }
 
@@ -218,6 +229,31 @@ impl<'a> OracleUi<'a> {
         self.animation = Some(animation);
         self
     }
+    #[must_use]
+    pub fn show_copilot_chat(mut self, show: bool) -> Self {
+        self.show_copilot_chat = show;
+        self
+    }
+    #[must_use]
+    pub fn copilot_chat_messages(mut self, messages: &'a [(String, String)]) -> Self {
+        self.copilot_chat_messages = messages;
+        self
+    }
+    #[must_use]
+    pub fn copilot_chat_input(mut self, input: &'a str) -> Self {
+        self.copilot_chat_input = input;
+        self
+    }
+    #[must_use]
+    pub fn copilot_chat_loading(mut self, loading: bool) -> Self {
+        self.copilot_chat_loading = loading;
+        self
+    }
+    #[must_use]
+    pub fn copilot_chat_scroll(mut self, scroll: usize) -> Self {
+        self.copilot_chat_scroll = scroll;
+        self
+    }
 
     fn render_search(&self, area: Rect, buf: &mut Buffer) {
         let placeholder = match self.current_tab {
@@ -319,13 +355,26 @@ impl Widget for OracleUi<'_> {
             .constraints([Constraint::Length(3), Constraint::Min(6)])
             .split(right_column);
         let tabs_rect = right_split[0];
-        let inspector_rect = right_split[1];
+        let right_content = right_split[1];
+
+        let (inspector_rect, chat_rect) = if self.show_copilot_chat {
+            let horz = Layout::default()
+                .direction(Direction::Horizontal)
+                .constraints([Constraint::Percentage(55), Constraint::Percentage(45)])
+                .split(right_content);
+            (horz[0], horz[1])
+        } else {
+            (right_content, right_content) // chat_rect unused
+        };
 
         self.render_search(search_rect, buf);
         self.render_list(list_rect, buf);
         self.render_vertical_divider(div_rect, buf);
         self.render_tabs(tabs_rect, buf);
         self.render_inspector(inspector_rect, buf);
+        if self.show_copilot_chat {
+            self.render_copilot_chat(chat_rect, buf);
+        }
         self.render_status(chunks[2], buf);
         self.render_completion(search_rect, buf);
         self.render_settings_overlay(area, buf);

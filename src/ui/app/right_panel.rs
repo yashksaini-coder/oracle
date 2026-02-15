@@ -4,10 +4,10 @@ use crate::ui::dependency_view::{self, DependencyDocView, DependencyView};
 use crate::ui::inspector::InspectorPanel;
 use ratatui::{
     buffer::Buffer,
-    layout::Rect,
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
-    widgets::{block::BorderType, Block, Borders, Paragraph, Widget},
+    widgets::{block::BorderType, Block, Borders, Paragraph, Widget, Wrap},
 };
 
 use super::types::{Focus, Tab};
@@ -228,7 +228,83 @@ impl<'a> OracleUi<'a> {
             .title(" ◇ Crate Info ");
         let paragraph = Paragraph::new(lines)
             .block(block)
-            .wrap(ratatui::widgets::Wrap { trim: false });
+            .wrap(Wrap { trim: false });
         paragraph.render(area, buf);
+    }
+
+    pub(super) fn render_copilot_chat(&self, area: Rect, buf: &mut Buffer) {
+        if area.width < 4 || area.height < 4 {
+            return;
+        }
+        let border_style = if self.focus == Focus::CopilotChat {
+            self.theme.style_border_focused()
+        } else {
+            self.theme.style_border()
+        };
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_type(BorderType::Rounded)
+            .border_style(border_style)
+            .title(" ◇ Copilot ");
+        let inner = block.inner(area);
+        block.render(area, buf);
+
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([Constraint::Min(2), Constraint::Length(1)])
+            .split(inner);
+        let messages_area = chunks[0];
+        let input_area = chunks[1];
+
+        let mut lines: Vec<Line<'_>> = Vec::new();
+        if self.copilot_chat_loading
+            && self.copilot_chat_messages.last().map(|(r, _)| r == "user") == Some(true)
+        {
+            lines.push(Line::from(Span::styled(
+                "  … Copilot is thinking…",
+                self.theme.style_muted(),
+            )));
+        }
+        for (role, content) in self.copilot_chat_messages.iter() {
+            let label = if role == "user" { "You" } else { "Copilot" };
+            let style = if role == "user" {
+                self.theme.style_accent()
+            } else {
+                self.theme.style_normal()
+            };
+            lines.push(Line::from(Span::styled(
+                format!("  {}: ", label),
+                self.theme.style_dim().add_modifier(Modifier::BOLD),
+            )));
+            for line in content.lines() {
+                lines.push(Line::from(vec![
+                    Span::raw("    "),
+                    Span::styled(line.to_string(), style),
+                ]));
+            }
+            lines.push(Line::from(""));
+        }
+
+        let scroll = self.copilot_chat_scroll.min(lines.len().saturating_sub(1));
+        let paragraph = Paragraph::new(lines.clone())
+            .wrap(Wrap { trim: false })
+            .scroll((0, scroll as u16));
+        paragraph.render(messages_area, buf);
+
+        let input_display: &str = if self.copilot_chat_input.is_empty() {
+            "Ask about this item… (Enter to send, Esc to close)"
+        } else {
+            self.copilot_chat_input
+        };
+        let input_style = if self.focus == Focus::CopilotChat {
+            self.theme.style_accent()
+        } else {
+            self.theme.style_muted()
+        };
+        let input_line = Paragraph::new(Line::from(vec![
+            Span::styled(" ▸ ", self.theme.style_dim()),
+            Span::styled(input_display, input_style),
+        ]));
+        input_line.render(input_area, buf);
     }
 }

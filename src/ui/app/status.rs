@@ -17,6 +17,7 @@ impl<'a> OracleUi<'a> {
             Focus::Search => ("🔍", "Search"),
             Focus::List => ("📋", "List"),
             Focus::Inspector => ("🔬", "Inspector"),
+            Focus::CopilotChat => ("💬", "Copilot"),
         };
 
         let status_line =
