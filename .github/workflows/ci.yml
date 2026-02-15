@@ -1,7 +1,9 @@
 name: CI
 
-# Minimal permissions
-permissions: {}
+# Minimal permissions (checks: write for Check Runs API; contents: read for checkout)
+permissions:
+  checks: write
+  contents: read
 
 on:
   workflow_dispatch:

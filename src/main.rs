@@ -325,30 +325,42 @@ fn handle_key_event(
     // Global shortcuts — never run when focus is CopilotChat
     let in_copilot_chat = app.focus == Focus::CopilotChat;
     match code {
-        KeyCode::Char('q') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('q')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.should_quit = true;
             return;
         }
-        KeyCode::Char('?') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('?')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.toggle_help();
             return;
         }
-        KeyCode::Char('t') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('t')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.cycle_theme();
             return;
         }
         KeyCode::Char('S')
-            if modifiers.contains(KeyModifiers::SHIFT) && !in_copilot_chat && app.focus != Focus::Search =>
+            if modifiers.contains(KeyModifiers::SHIFT)
+                && !in_copilot_chat
+                && app.focus != Focus::Search =>
         {
             app.toggle_settings();
             return;
         }
-        KeyCode::Char('g') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('g')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             let _ = webbrowser::open("https://github.com/yashksaini-coder/oracle");
             return;
         }
         KeyCode::Char('C')
-            if modifiers.contains(KeyModifiers::SHIFT) && !in_copilot_chat && app.focus != Focus::Search =>
+            if modifiers.contains(KeyModifiers::SHIFT)
+                && !in_copilot_chat
+                && app.focus != Focus::Search =>
         {
             if app.selected_item().is_some() {
                 app.toggle_copilot_chat();
@@ -357,7 +369,9 @@ fn handle_key_event(
             }
             return;
         }
-        KeyCode::Char('s') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('s')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             let _ = webbrowser::open("https://github.com/sponsors/yashksaini-coder");
             return;
         }
@@ -398,28 +412,36 @@ fn handle_key_event(
 
     // Tab switching with number keys (not when typing in Copilot chat)
     match code {
-        KeyCode::Char('1') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('1')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.current_tab = Tab::Types;
             app.list_state.select(Some(0));
             app.filter_items();
             animation.on_tab_change();
             return;
         }
-        KeyCode::Char('2') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('2')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.current_tab = Tab::Functions;
             app.list_state.select(Some(0));
             app.filter_items();
             animation.on_tab_change();
             return;
         }
-        KeyCode::Char('3') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('3')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.current_tab = Tab::Modules;
             app.list_state.select(Some(0));
             app.filter_items();
             animation.on_tab_change();
             return;
         }
-        KeyCode::Char('4') if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search => {
+        KeyCode::Char('4')
+            if modifiers.is_empty() && !in_copilot_chat && app.focus != Focus::Search =>
+        {
             app.current_tab = Tab::Crates;
             app.list_state.select(Some(0));
             if app.installed_crates_list.is_empty() {

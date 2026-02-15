@@ -56,7 +56,8 @@ fmt-fix:
 	@echo "🎨 Fixing code format..."
 	cargo fmt --all
 
-check: fmt lint typecheck test
+check: fmt lint typecheck test machete clippy clippy-beta
+fix: fmt-fix lint-fix
 
 clippy:
 	@echo "🧹 Running strict clippy (pedantic, etc)..."
