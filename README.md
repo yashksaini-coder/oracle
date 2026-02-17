@@ -150,6 +150,9 @@ We use [Conventional Commits](https://www.conventionalcommits.org/). Examples:
 - `fix: correct parsing error`
 - `docs: update README`
 - `refactor!: change API structure` (breaking change)
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=yashksaini-coder/oracle&type=date&legend=top-left)](https://www.star-history.com/#yashksaini-coder/oracle&type=date&legend=top-left)
 
 ## 📄 License
 
